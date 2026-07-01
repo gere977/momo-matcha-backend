@@ -2,12 +2,16 @@ import { loadEnv, defineConfig, Modules } from '@medusajs/framework/utils'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
-// Redis-backed cache/event-bus/workflow-engine/locking are production-only: Upstash's
-// serverless Redis hung on these locally (see project notes), so local dev deliberately
-// uses Medusa's in-memory defaults instead. Railway's own dedicated Redis is a normal
-// instance and shouldn't have the same issue - gating on NODE_ENV keeps local dev safe
-// even though REDIS_URL happens to be set locally too (pointed at Upstash for reference).
+// Redis-backed cache/event-bus/workflow-engine/locking use BullMQ, which holds long-lived
+// *blocking* Redis connections. Railway's Redis drops idle/blocking connections (surfaces as
+// "Connection ended unexpectedly"), and the Medusa loaders set maxRetriesPerRequest:null, so a
+// command on a dropped connection retries forever instead of erroring. That hangs boot inside
+// createDefaultsWorkflow (right after route registration) and the server never binds its port -
+// verified by A/B test: with these modules the process never listens; without them it binds in ~4s.
+// Same failure the config originally hit with Upstash. Fall back to Medusa's in-memory defaults
+// (identical to local dev) unless explicitly opted in via USE_REDIS_MODULES=true.
 const isProduction = process.env.NODE_ENV === 'production'
+const useRedisModules = isProduction && process.env.USE_REDIS_MODULES === 'true'
 
 module.exports = defineConfig({
   projectConfig: {
@@ -21,7 +25,7 @@ module.exports = defineConfig({
     }
   },
   modules: [
-    ...(isProduction
+    ...(useRedisModules
       ? [
           {
             key: Modules.CACHE,
