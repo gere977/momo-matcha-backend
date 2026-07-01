@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.git
+.medusa
+**/.medusa
+.next
+**/.next
+.turbo
+**/.turbo
+npm-debug.log
+*.log
+.env
+.env.*
+!.env.template
+!apps/backend/.env.template
