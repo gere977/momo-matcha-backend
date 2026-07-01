@@ -71,17 +71,6 @@ module.exports = defineConfig({
               environment: process.env.BARION_ENVIRONMENT || 'test',
             },
           },
-          {
-            resolve: './src/modules/payment-simplepay',
-            id: 'simplepay',
-            options: {
-              merchantId: process.env.SIMPLEPAY_MERCHANT_ID,
-              secretKeys: {
-                HUF: process.env.SIMPLEPAY_SECRET_KEY_HUF,
-              },
-              environment: process.env.SIMPLEPAY_ENVIRONMENT || 'sandbox',
-            },
-          },
         ],
       },
     },

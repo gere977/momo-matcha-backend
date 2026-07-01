@@ -114,8 +114,12 @@ class BarionProviderService extends AbstractPaymentProvider<BarionOptions> {
       Locale: this.options_.locale ?? "hu-HU",
       Currency: currency_code.toUpperCase(),
       PaymentRequestId: `${sessionId}-${Date.now()}`,
-      RedirectUrl: (context as any)?.barion_redirect_url,
-      CallbackUrl: (context as any)?.barion_callback_url,
+      RedirectUrl:
+        (context as any)?.barion_redirect_url ??
+        `${process.env.STOREFRONT_URL}/hu/checkout/payment-return`,
+      CallbackUrl:
+        (context as any)?.barion_callback_url ??
+        `${process.env.MEDUSA_BACKEND_URL}/hooks/payment/barion_barion`,
       Transactions: [
         {
           POSTransactionId: sessionId,

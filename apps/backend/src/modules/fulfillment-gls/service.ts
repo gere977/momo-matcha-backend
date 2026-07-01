@@ -11,14 +11,16 @@ import {
 } from "@medusajs/types"
 
 // Standard GLS door delivery, no locker-picker needed (unlike FoxPost). Field names and
-// auth scheme confirmed against the MyGLS API's public documentation and reference PHP SDK
-// (github.com/digicode-kft/mygls-sdk): the Password field is the SHA-512 digest of the
-// password sent as a JSON array of raw bytes, not a hex string.
+// auth scheme confirmed against the official MyGLS API for system integration doc
+// (ver. 25.12.11): the Password field is the SHA-512 digest of the password sent as a
+// JSON array of raw bytes (byte[]), not a hex string. PrintLabels requires WebshopEngine
+// and returns PrintLabelsInfoList (NOT ParcelInfoList, which is PrepareLabels-only).
 type GlsOptions = {
   username: string
   password: string
   clientNumber: string
   environment: "test" | "prod"
+  typeOfPrinter?: string
   pickupAddress: {
     name: string
     street: string
@@ -67,9 +69,16 @@ class GlsFulfillmentService extends AbstractFulfillmentProviderService {
       }),
     })
     const json = await response.json()
-    if (!response.ok || json?.PrintLabelsErrorList?.length) {
+    // Each GLS operation names its error list differently (PrintLabelsErrorList,
+    // DeleteLabelsErrorList, etc.) - check any "*ErrorList" field rather than hardcoding one.
+    const errorListKey = Object.keys(json ?? {}).find(
+      (key) => key.endsWith("ErrorList") && Array.isArray(json[key]) && json[key].length
+    )
+    if (!response.ok || errorListKey) {
       this.logger_.error(`[GLS] Request to ${path} failed: ${JSON.stringify(json)}`)
-      throw new Error(`GLS request failed: ${JSON.stringify(json?.PrintLabelsErrorList ?? json)}`)
+      throw new Error(
+        `GLS request failed: ${JSON.stringify(errorListKey ? json[errorListKey] : json)}`
+      )
     }
     return json
   }
@@ -108,6 +117,8 @@ class GlsFulfillmentService extends AbstractFulfillmentProviderService {
     const pu = this.options_.pickupAddress
 
     const result = await this.call("/PrintLabels", {
+      WebshopEngine: "Medusa",
+      TypeOfPrinter: this.options_.typeOfPrinter ?? "A4_2x2",
       ParcelList: [
         {
           ClientNumber: Number(this.options_.clientNumber),
@@ -138,7 +149,10 @@ class GlsFulfillmentService extends AbstractFulfillmentProviderService {
       ],
     })
 
-    const parcelInfo = result.ParcelInfoList?.[0]
+    // PrintLabels returns PrintLabelsInfoList - not ParcelInfoList, which is the
+    // separate PrepareLabels endpoint's response field (easy mix-up, confirmed
+    // against the official MyGLS API doc).
+    const parcelInfo = result.PrintLabelsInfoList?.[0]
 
     return {
       data: {
@@ -151,9 +165,11 @@ class GlsFulfillmentService extends AbstractFulfillmentProviderService {
   }
 
   async cancelFulfillment(data: Record<string, unknown>) {
-    this.logger_.warn(
-      `[GLS] cancelFulfillment called for parcel ${data.gls_parcel_number} - no confirmed public cancel API; cancel manually via the MyGLS web portal.`
-    )
+    const parcelId = data.gls_parcel_id as number | undefined
+    if (parcelId) {
+      await this.call("/DeleteLabels", { ParcelIdList: [parcelId] })
+      this.logger_.info(`[GLS] Deleted parcel ${data.gls_parcel_number} (id ${parcelId}).`)
+    }
     return { data }
   }
 
