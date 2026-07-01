@@ -175,8 +175,7 @@ export default async function seed_hu({
     const fulfillmentModuleService = container.resolve(
       ModuleRegistrationName.FULFILLMENT
     );
-    await fulfillmentModuleService.updateServiceZones({
-      id: serviceZone.id,
+    await fulfillmentModuleService.updateServiceZones(serviceZone.id, {
       geo_zones: [
         // @ts-ignore - existing geo zones aren't typed on the graph query above
         ...(serviceZone.geo_zones ?? []),

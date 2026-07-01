@@ -1,6 +1,6 @@
 import { AbstractFulfillmentProviderService } from "@medusajs/framework/utils"
-import { Logger } from "@medusajs/framework/types"
 import {
+  Logger,
   CalculatedShippingOptionPrice,
   CalculateShippingOptionPriceContext,
   CreateFulfillmentResult,
@@ -8,7 +8,7 @@ import {
   FulfillmentOption,
   FulfillmentOrderDTO,
   ValidateFulfillmentDataContext,
-} from "@medusajs/types"
+} from "@medusajs/framework/types"
 
 // FoxPost is locker/APM-based - the storefront must show FoxPost's locker-picker widget at
 // checkout and pass the chosen locker id through as `data.destination` (e.g. "hu35"). Field
@@ -105,9 +105,11 @@ class FoxpostFulfillmentService extends AbstractFulfillmentProviderService {
 
     return {
       data: {
-        ...(fulfillment.data as object),
+        ...(fulfillment.data as Record<string, unknown>),
         foxpost_barcode: parcel?.barcode ?? parcel?.uniqueBarcode,
       },
+      // Label PDFs are fetched on demand via getFulfillmentDocuments, not at creation time.
+      labels: [],
     }
   }
 
@@ -132,7 +134,7 @@ class FoxpostFulfillmentService extends AbstractFulfillmentProviderService {
   }
 
   async createReturnFulfillment(fulfillment: Record<string, unknown>): Promise<CreateFulfillmentResult> {
-    return { data: fulfillment.data as object }
+    return { data: fulfillment.data as Record<string, unknown>, labels: [] }
   }
 
   async getReturnDocuments() {

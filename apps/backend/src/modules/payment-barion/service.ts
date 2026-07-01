@@ -86,7 +86,7 @@ class BarionProviderService extends AbstractPaymentProvider<BarionOptions> {
     if (!response.ok || json.Errors?.length) {
       this.logger_.error(`[Barion] Request to ${path} failed: ${JSON.stringify(json)}`)
       throw new MedusaError(
-        MedusaError.Types.PAYMENT_ERROR,
+        MedusaError.Types.PAYMENT_AUTHORIZATION_ERROR,
         `Barion request failed: ${json.Errors?.[0]?.Title ?? response.statusText}`
       )
     }
@@ -105,7 +105,7 @@ class BarionProviderService extends AbstractPaymentProvider<BarionOptions> {
 
   async initiatePayment(input: InitiatePaymentInput): Promise<InitiatePaymentOutput> {
     const { amount, currency_code, context } = input
-    const sessionId = context?.session_id ?? context?.resource_id ?? ""
+    const sessionId = context?.idempotency_key ?? ""
 
     const payload = {
       PaymentType: "Immediate",

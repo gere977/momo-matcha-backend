@@ -1,14 +1,14 @@
 import crypto from "crypto"
 import { AbstractFulfillmentProviderService } from "@medusajs/framework/utils"
-import { Logger } from "@medusajs/framework/types"
 import {
+  Logger,
   CalculatedShippingOptionPrice,
   CreateFulfillmentResult,
   FulfillmentItemDTO,
   FulfillmentOption,
   FulfillmentOrderDTO,
   ValidateFulfillmentDataContext,
-} from "@medusajs/types"
+} from "@medusajs/framework/types"
 
 // Standard GLS door delivery, no locker-picker needed (unlike FoxPost). Field names and
 // auth scheme confirmed against the official MyGLS API for system integration doc
@@ -156,11 +156,13 @@ class GlsFulfillmentService extends AbstractFulfillmentProviderService {
 
     return {
       data: {
-        ...(fulfillment.data as object),
+        ...(fulfillment.data as Record<string, unknown>),
         gls_parcel_id: parcelInfo?.ParcelId,
         gls_parcel_number: parcelInfo?.ParcelNumber,
         gls_label_base64: result.Labels,
       },
+      // Label PDFs are fetched on demand via getFulfillmentDocuments, not at creation time.
+      labels: [],
     }
   }
 
@@ -179,7 +181,7 @@ class GlsFulfillmentService extends AbstractFulfillmentProviderService {
   }
 
   async createReturnFulfillment(fulfillment: Record<string, unknown>): Promise<CreateFulfillmentResult> {
-    return { data: fulfillment.data as object }
+    return { data: fulfillment.data as Record<string, unknown>, labels: [] }
   }
 
   async getReturnDocuments() {
