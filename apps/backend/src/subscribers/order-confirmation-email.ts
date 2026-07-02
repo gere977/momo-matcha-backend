@@ -11,7 +11,20 @@ export default async function orderConfirmationHandler({
   const { data: orders } = await query.graph({
     entity: "order",
     filters: { id: data.id },
-    fields: ["id", "display_id", "email", "currency_code", "total", "items.title", "items.quantity"],
+    fields: [
+      "id",
+      "display_id",
+      "email",
+      "currency_code",
+      "subtotal",
+      "shipping_total",
+      "discount_total",
+      "total",
+      "items.title",
+      "items.quantity",
+      "items.unit_price",
+      "items.total",
+    ],
   })
   const order = orders[0]
   if (!order) return
@@ -23,8 +36,11 @@ export default async function orderConfirmationHandler({
     data: {
       subject: `Rendelésed visszaigazolása - #${order.display_id}`,
       order_number: order.display_id,
-      total: order.total,
       currency_code: order.currency_code,
+      subtotal: order.subtotal,
+      shipping_total: order.shipping_total,
+      discount_total: order.discount_total,
+      total: order.total,
       items: order.items,
     },
   })
