@@ -124,13 +124,19 @@ module.exports = defineConfig({
       options: {
         providers: [
           {
-            // Logs notifications to the console instead of sending real email - swap this
-            // block for '@medusajs/notification-sendgrid' (options: { apiKey, from }) once
-            // you have a SendGrid account and have designed the dynamic templates there.
-            resolve: '@medusajs/notification-local',
-            id: 'local',
+            // Custom Resend provider (src/modules/notification-resend). Sends real,
+            // branded emails via the Resend REST API when RESEND_API_KEY is set, and
+            // just logs when it isn't (e.g. local dev) so nothing breaks. Handles the
+            // order-confirmation / shipping-confirmation / password-reset / welcome
+            // templates used by the subscribers.
+            resolve: './src/modules/notification-resend',
+            id: 'resend',
             options: {
               channels: ['email'],
+              apiKey: process.env.RESEND_API_KEY,
+              from:
+                process.env.RESEND_FROM_EMAIL ||
+                'Momo Matcha <onboarding@resend.dev>',
             },
           },
         ],
