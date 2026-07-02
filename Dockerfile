@@ -36,7 +36,7 @@ COPY . .
 # logs showing 0ms "cached" execution for a command that should take ~30s).
 # Bumping CACHE_BUST changes the instruction text, forcing a genuine cache
 # miss - increment it any time a deploy needs to guarantee a real rebuild.
-ARG CACHE_BUST=3
+ARG CACHE_BUST=4
 RUN echo "cache-bust:${CACHE_BUST}" && NODE_ENV=production pnpm exec turbo build --filter=@dtc/backend
 
 # ---- runtime: only what's needed to run `medusa start` ----
