@@ -53,6 +53,31 @@ async function fetchOrders(): Promise<AdminOrder[]> {
   return (data.orders ?? []) as AdminOrder[]
 }
 
+const LOW_STOCK_THRESHOLD = 5
+
+type InventoryItem = {
+  id: string
+  sku?: string
+  title?: string
+  stocked_quantity?: number
+  reserved_quantity?: number
+}
+
+async function fetchInventory(): Promise<InventoryItem[]> {
+  const res = await fetch(
+    `/admin/inventory-items?limit=200&fields=id,sku,title,stocked_quantity,reserved_quantity`,
+    { credentials: "include" }
+  )
+  if (!res.ok) throw new Error(`Failed to load inventory (${res.status})`)
+  const data = await res.json()
+  return (data.inventory_items ?? []) as InventoryItem[]
+}
+
+function availableQty(item: InventoryItem): number | null {
+  if (typeof item.stocked_quantity !== "number") return null
+  return item.stocked_quantity - (item.reserved_quantity ?? 0)
+}
+
 function formatMoney(amount: number, currency?: string) {
   try {
     return new Intl.NumberFormat("hu-HU", {
@@ -109,6 +134,17 @@ const OverviewPage = () => {
     queryKey: ["overview-orders"],
     queryFn: fetchOrders,
   })
+  const { data: inventory = [] } = useQuery({
+    queryKey: ["overview-inventory"],
+    queryFn: fetchInventory,
+  })
+
+  const lowStock = inventory
+    .map((item) => ({ item, available: availableQty(item) }))
+    .filter(
+      (x) => x.available !== null && x.available <= LOW_STOCK_THRESHOLD
+    )
+    .sort((a, b) => (a.available ?? 0) - (b.available ?? 0))
 
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
@@ -148,7 +184,7 @@ const OverviewPage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-4">
         <Kpi
           label="Mai rendelések"
           value={isLoading ? "…" : String(todaysOrders.length)}
@@ -164,7 +200,47 @@ const OverviewPage = () => {
           value={isLoading ? "…" : String(awaiting.length)}
           hint="Csomagolásra/feladásra váró rendelés"
         />
+        <Kpi
+          label="Alacsony készlet"
+          value={String(lowStock.length)}
+          hint={`${LOW_STOCK_THRESHOLD} db vagy kevesebb`}
+        />
       </div>
+
+      {lowStock.length > 0 && (
+        <div className="px-6">
+          <Heading level="h2" className="mb-2">
+            Alacsony készlet — figyelmeztetés
+          </Heading>
+          <Container className="p-0">
+            <Table>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell>Termék / SKU</Table.HeaderCell>
+                  <Table.HeaderCell className="text-right">
+                    Elérhető
+                  </Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {lowStock.slice(0, 10).map(({ item, available }) => (
+                  <Table.Row key={item.id}>
+                    <Table.Cell>{item.title || item.sku || item.id}</Table.Cell>
+                    <Table.Cell className="text-right">
+                      <Badge
+                        size="2xsmall"
+                        color={(available ?? 0) <= 0 ? "red" : "orange"}
+                      >
+                        {available} db
+                      </Badge>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table>
+          </Container>
+        </div>
+      )}
 
       <div className="px-6 pb-6">
         <Heading level="h2" className="mb-2">
