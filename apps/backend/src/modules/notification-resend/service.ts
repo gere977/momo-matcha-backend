@@ -20,6 +20,8 @@ const ACCENT = "#D94E41"
 const CREAM = "#F1EDE4"
 const KRAFT = "#E3D6C4"
 const STORE_URL = "https://momomatcha.hu"
+const LOGO_URL = `${STORE_URL}/images/logo.jpg`
+const LIFESTYLE_URL = `${STORE_URL}/images/lifestyle-drinking.png`
 
 function formatMoney(amount: number, currency?: string) {
   try {
@@ -52,8 +54,8 @@ function layout(bodyHtml: string, preheader = "") {
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:92%;">
         <tr><td align="center" style="padding:6px 0 22px;">
-          <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:700;color:${MATCHA};letter-spacing:1px;">Momo&nbsp;Matcha</div>
-          <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#A08D6E;margin-top:5px;">Rituálék a lassú élethez</div>
+          <img src="${LOGO_URL}" width="84" height="84" alt="Momo Matcha" style="display:block;margin:0 auto;border-radius:16px;border:1px solid ${KRAFT};" />
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#A08D6E;margin-top:8px;">Rituálék a lassú élethez</div>
         </td></tr>
         <tr><td style="background:#ffffff;border:1px solid ${KRAFT};border-radius:14px;padding:34px;font-family:Arial,Helvetica,sans-serif;color:#3a3a3a;line-height:1.6;">
           ${bodyHtml}
@@ -151,8 +153,9 @@ function renderBody(template: string, data: Record<string, any>): string {
 
     case "welcome":
       return `
+        <img src="${LIFESTYLE_URL}" alt="" width="100%" style="display:block;width:100%;border-radius:12px;margin:-10px 0 20px;" />
         ${h1(`Üdvözlünk, ${data.first_name ?? ""}! 🌿`)}
-        <p style="color:#666;">Örülünk, hogy csatlakoztál a Momo Matcha közösséghez. Fedezd fel prémium, bio ceremoniális matcháinkat Uji dombjairól, és találd meg a saját reggeli rituáléd.</p>
+        <p style="color:#666;">Örülünk, hogy csatlakoztál a Momo Matcha közösséghez. Fedezd fel prémium, bio matcháinkat Uji dombjairól — a klasszikus szertartásostól a gyümölcsös ízesítettekig —, és találd meg a saját reggeli rituáléd.</p>
         ${button(STORE_URL, "Irány a bolt")}`
 
     default:
