@@ -14,9 +14,9 @@ type InjectedDependencies = {
   logger: Logger
 }
 
-// Brand palette
-const MATCHA = "#6A8D53"
-const ACCENT = "#D94E41"
+// Brand palette (matches the storefront's warm genZ rebrand)
+const MATCHA = "#7C9B5E"
+const ACCENT = "#E06B85"
 const CREAM = "#F1EDE4"
 const KRAFT = "#E3D6C4"
 const STORE_URL = "https://momomatcha.hu"
