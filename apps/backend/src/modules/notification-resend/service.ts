@@ -151,6 +151,30 @@ function renderBody(template: string, data: Record<string, any>): string {
         ${button(data.reset_url ?? "#", "Új jelszó beállítása")}
         <p style="color:#aaa;font-size:13px;margin-top:12px;">Ha nem te kérted, nyugodtan hagyd figyelmen kívül ezt az e-mailt — a jelszavad változatlan marad.</p>`
 
+    case "admin-order-notification": {
+      const items = Array.isArray(data.items) ? data.items : []
+      const rows = items
+        .map(
+          (i: any) =>
+            `<tr>
+              <td style="padding:8px 0;border-bottom:1px solid #F0EBE0;font-size:14px;">${i.title ?? ""} <span style="color:#aaa;">× ${i.quantity ?? 1}</span></td>
+            </tr>`
+        )
+        .join("")
+
+      return `
+        ${h1(`Új rendelés érkezett! 🎉 #${data.order_number}`)}
+        <p style="color:#666;margin:0 0 16px;">
+          <strong>Vásárló:</strong> ${data.customer_name ?? ""} (${data.customer_email ?? ""})<br/>
+          <strong>Végösszeg:</strong> ${formatMoney(data.total, cur)}<br/>
+          <strong>Szállítás:</strong> ${data.shipping_method ?? "-"}<br/>
+          ${data.pickup_point ? `<strong>Átvételi pont:</strong> ${data.pickup_point}<br/>` : ""}
+          <strong>Fizetés:</strong> ${data.payment_method ?? "-"}
+        </p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+        ${button(`https://admin.momomatcha.hu/app/orders/${data.order_id ?? ""}`, "Rendelés megnyitása az adminban")}`
+    }
+
     case "welcome":
       return `
         <img src="${LIFESTYLE_URL}" alt="" width="100%" style="display:block;width:100%;border-radius:12px;margin:-10px 0 20px;" />

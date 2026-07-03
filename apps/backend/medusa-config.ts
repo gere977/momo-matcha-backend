@@ -25,6 +25,10 @@ module.exports = defineConfig({
     }
   },
   modules: [
+    {
+      // First-party pageview analytics (admin "Statisztika" page)
+      resolve: './src/modules/analytics-lite',
+    },
     ...(useRedisModules
       ? [
           {
