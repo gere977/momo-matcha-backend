@@ -35,7 +35,8 @@ export default async function setup_shipping({
     fields: ["id", "name"],
   });
 
-  let location = locations[0];
+  // query.graph rows and workflow results use different DTO shapes; only id/name are used.
+  let location: any = locations[0];
   if (!location) {
     const { result } = await createStockLocationsWorkflow(container).run({
       input: {
@@ -80,7 +81,7 @@ export default async function setup_shipping({
     ],
   });
 
-  let fulfillmentSet = fulfillmentSets[0];
+  let fulfillmentSet: any = fulfillmentSets[0];
   if (!fulfillmentSet) {
     fulfillmentSet = await fulfillmentModuleService.createFulfillmentSets({
       name: "Magyarország szállítás",
