@@ -82,5 +82,35 @@ export default async function fix_catalog({
     );
   }
 
+  // Link the flavored matcha products directly by handle (from seed-real-catalog
+  // they may not be in a category), and unpublish the old imageless placeholder.
+  const { data: allProducts } = await query.graph({
+    entity: "product",
+    fields: ["id", "handle", "title"],
+  });
+  const flavorIds = allProducts
+    .filter((p) => (p.handle ?? "").includes("premium-momo-matcha"))
+    .map((p) => p.id);
+  if (flavorIds.length) {
+    await productModuleService.updateProducts(
+      { id: flavorIds },
+      { collection_id: matchaCollectionId }
+    );
+    logger.info(
+      `Linked ${flavorIds.length} flavored matcha product(s) to the collection.`
+    );
+  }
+
+  const oldPlaceholder = allProducts.find(
+    (p) => p.title === "Szertartásos Matcha"
+  );
+  if (oldPlaceholder) {
+    await productModuleService.updateProducts(
+      { id: oldPlaceholder.id },
+      { status: "draft" }
+    );
+    logger.info("Unpublished old placeholder 'Szertartásos Matcha'.");
+  }
+
   logger.info("Catalog fix complete.");
 }

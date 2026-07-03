@@ -75,6 +75,12 @@ module.exports = defineConfig({
               environment: process.env.BARION_ENVIRONMENT || 'test',
             },
           },
+          {
+            // Cash on delivery ("utánvét") - authorizes immediately, the
+            // courier collects on delivery. Fee handled via shipping options.
+            resolve: './src/modules/payment-cod',
+            id: 'cod',
+          },
         ],
       },
     },
