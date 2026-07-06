@@ -1,6 +1,7 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { NavClient, buildInvoiceXml } from "../modules/nav-invoicing/nav-client"
+import { asNumber } from "../utils/money"
 
 // Reports every placed order to NAV's Online Számla system, as legally required for a
 // registered Hungarian business (egyéni vállalkozás) issuing invoices - see the plan's
@@ -37,12 +38,12 @@ export default async function navInvoiceOnOrderPlaced({
       "customer.first_name",
       "customer.last_name",
       "billing_address.*",
-      "items.title",
-      "items.quantity",
-      "items.unit_price",
-      "items.total",
+      // Full item data is required for the order-level totals to compute
+      // correctly - with a narrow field list `total` excluded the items.
+      "items.*",
       "total",
       "subtotal",
+      "shipping_total",
       "tax_total",
     ],
   })
@@ -64,24 +65,41 @@ export default async function navInvoiceOnOrderPlaced({
 
   const today = new Date().toISOString().slice(0, 10)
   const vatRate = 0.27
-  const grossTotal = Number(order.total ?? 0)
+  const grossTotal = asNumber(order.total)
   const netTotal = Math.round(grossTotal / (1 + vatRate))
   const vatTotal = grossTotal - netTotal
 
   const lines = (order.items ?? []).map((item: any, i: number) => {
-    const lineGross = Number(item.total ?? 0)
+    const lineGross = asNumber(item.total)
     const lineNet = Math.round(lineGross / (1 + vatRate))
     return {
       lineNumber: i + 1,
       description: item.title,
-      quantity: item.quantity,
-      unitPrice: Number(item.unit_price ?? 0),
+      quantity: asNumber(item.quantity),
+      unitPrice: asNumber(item.unit_price),
       netAmount: lineNet,
       vatRate,
       vatAmount: lineGross - lineNet,
       grossAmount: lineGross,
     }
   })
+
+  // Shipping is part of the invoice total, so it needs its own line -
+  // otherwise the line amounts don't add up to the invoice totals.
+  const shippingGross = asNumber(order.shipping_total)
+  if (shippingGross > 0) {
+    const shippingNet = Math.round(shippingGross / (1 + vatRate))
+    lines.push({
+      lineNumber: lines.length + 1,
+      description: "Szállítási költség",
+      quantity: 1,
+      unitPrice: shippingGross,
+      netAmount: shippingNet,
+      vatRate,
+      vatAmount: shippingGross - shippingNet,
+      grossAmount: shippingGross,
+    })
+  }
 
   const invoiceXml = buildInvoiceXml({
     invoiceNumber: `MOMO-${order.display_id}`,

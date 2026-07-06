@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { asNumber } from "../utils/money"
 
 export default async function orderConfirmationHandler({
   event: { data },
@@ -16,14 +17,13 @@ export default async function orderConfirmationHandler({
       "display_id",
       "email",
       "currency_code",
-      "subtotal",
+      "item_total",
       "shipping_total",
       "discount_total",
       "total",
-      "items.title",
-      "items.quantity",
-      "items.unit_price",
-      "items.total",
+      // Full item data is required for the order-level totals to compute
+      // correctly - with a narrow field list `total` excluded the items.
+      "items.*",
     ],
   })
   const order = orders[0]
@@ -37,11 +37,17 @@ export default async function orderConfirmationHandler({
       subject: `Rendelésed visszaigazolása - #${order.display_id}`,
       order_number: order.display_id,
       currency_code: order.currency_code,
-      subtotal: order.subtotal,
-      shipping_total: order.shipping_total,
-      discount_total: order.discount_total,
-      total: order.total,
-      items: order.items,
+      // Gross (VAT included) - matches the storefront's tax-inclusive display.
+      subtotal: asNumber(order.item_total),
+      shipping_total: asNumber(order.shipping_total),
+      discount_total: asNumber(order.discount_total),
+      total: asNumber(order.total),
+      items: (order.items ?? []).map((item: any) => ({
+        title: item?.title,
+        quantity: asNumber(item?.quantity),
+        unit_price: asNumber(item?.unit_price),
+        total: asNumber(item?.total),
+      })),
     },
   })
 }

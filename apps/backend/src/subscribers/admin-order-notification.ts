@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { asNumber } from "../utils/money"
 
 const PAYMENT_TITLES: Record<string, string> = {
   pp_system_default: "Banki átutalás",
@@ -50,8 +51,9 @@ export default async function adminOrderNotificationHandler({
       "currency_code",
       "total",
       "metadata",
-      "items.title",
-      "items.quantity",
+      // Full item data is required for the order-level totals to compute
+      // correctly - with a narrow field list `total` excluded the items.
+      "items.*",
       "shipping_address.first_name",
       "shipping_address.last_name",
       "shipping_methods.name",
@@ -75,7 +77,7 @@ export default async function adminOrderNotificationHandler({
         order_id: order.id,
         order_number: order.display_id,
         currency_code: order.currency_code,
-        total: order.total,
+        total: asNumber(order.total),
         customer_email: order.email,
         customer_name: `${order.shipping_address?.first_name ?? ""} ${
           order.shipping_address?.last_name ?? ""
@@ -85,7 +87,12 @@ export default async function adminOrderNotificationHandler({
           ? `${pickupPoint.name} (${pickupPoint.address})`
           : null,
         payment_method: PAYMENT_TITLES[providerId] ?? providerId,
-        items: order.items,
+        items: (order.items ?? []).map((item: any) => ({
+          title: item?.title,
+          quantity: asNumber(item?.quantity),
+          unit_price: asNumber(item?.unit_price),
+          total: asNumber(item?.total),
+        })),
       },
     })
   }
