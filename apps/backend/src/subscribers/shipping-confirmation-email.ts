@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { publicOrderNumber } from "../utils/order-number"
 
 export default async function shippingConfirmationHandler({
   event: { data },
@@ -22,8 +23,8 @@ export default async function shippingConfirmationHandler({
     channel: "email",
     template: "shipping-confirmation",
     data: {
-      subject: `Csomagod úton van! - Rendelés #${order.display_id}`,
-      order_number: order.display_id,
+      subject: `Csomagod úton van! - Rendelés #${publicOrderNumber(order.display_id)}`,
+      order_number: publicOrderNumber(order.display_id),
     },
   })
 }

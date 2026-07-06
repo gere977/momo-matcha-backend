@@ -166,6 +166,7 @@ function renderBody(template: string, data: Record<string, any>): string {
         ${h1(`Új rendelés érkezett! 🎉 #${data.order_number}`)}
         <p style="color:#666;margin:0 0 16px;">
           <strong>Vásárló:</strong> ${data.customer_name ?? ""} (${data.customer_email ?? ""})<br/>
+          ${data.internal_order_number ? `<strong>Belső azonosító (admin):</strong> #${data.internal_order_number}<br/>` : ""}
           <strong>Végösszeg:</strong> ${formatMoney(data.total, cur)}<br/>
           <strong>Szállítás:</strong> ${data.shipping_method ?? "-"}<br/>
           ${data.pickup_point ? `<strong>Átvételi pont:</strong> ${data.pickup_point}<br/>` : ""}

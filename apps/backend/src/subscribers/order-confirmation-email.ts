@@ -1,6 +1,7 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { asNumber } from "../utils/money"
+import { publicOrderNumber } from "../utils/order-number"
 
 export default async function orderConfirmationHandler({
   event: { data },
@@ -34,8 +35,8 @@ export default async function orderConfirmationHandler({
     channel: "email",
     template: "order-confirmation",
     data: {
-      subject: `Rendelésed visszaigazolása - #${order.display_id}`,
-      order_number: order.display_id,
+      subject: `Rendelésed visszaigazolása - #${publicOrderNumber(order.display_id)}`,
+      order_number: publicOrderNumber(order.display_id),
       currency_code: order.currency_code,
       // Gross (VAT included) - matches the storefront's tax-inclusive display.
       subtotal: asNumber(order.item_total),

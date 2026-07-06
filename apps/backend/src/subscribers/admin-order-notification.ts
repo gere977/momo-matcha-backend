@@ -1,6 +1,7 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { asNumber } from "../utils/money"
+import { publicOrderNumber } from "../utils/order-number"
 
 const PAYMENT_TITLES: Record<string, string> = {
   pp_system_default: "Banki átutalás",
@@ -73,9 +74,10 @@ export default async function adminOrderNotificationHandler({
       channel: "email",
       template: "admin-order-notification",
       data: {
-        subject: `Új rendelés: #${order.display_id} (${order.email})`,
+        subject: `Új rendelés: #${publicOrderNumber(order.display_id)} (${order.email})`,
         order_id: order.id,
-        order_number: order.display_id,
+        order_number: publicOrderNumber(order.display_id),
+        internal_order_number: order.display_id,
         currency_code: order.currency_code,
         total: asNumber(order.total),
         customer_email: order.email,
