@@ -77,6 +77,7 @@ module.exports = defineConfig({
             options: {
               posKey: process.env.BARION_POS_KEY,
               environment: process.env.BARION_ENVIRONMENT || 'test',
+              payeeEmail: process.env.BARION_PAYEE_EMAIL,
             },
           },
           {

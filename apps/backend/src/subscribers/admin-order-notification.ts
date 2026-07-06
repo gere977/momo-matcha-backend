@@ -7,8 +7,9 @@ const PAYMENT_TITLES: Record<string, string> = {
   pp_barion_barion: "Barion",
 }
 
-// Lets the shop owners know immediately when an order lands. Recipients come
-// from ADMIN_NOTIFICATION_EMAILS (comma separated), defaulting to the shop inbox.
+// Lets the shop owners know immediately when an order lands. Every admin
+// user registered on the dashboard gets the email; ADMIN_NOTIFICATION_EMAILS
+// (comma separated) can add extra recipients without an admin account.
 export default async function adminOrderNotificationHandler({
   event: { data },
   container,
@@ -16,12 +17,26 @@ export default async function adminOrderNotificationHandler({
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
   const notificationModuleService = container.resolve(Modules.NOTIFICATION)
 
-  const recipients = (
-    process.env.ADMIN_NOTIFICATION_EMAILS || "info@momomatcha.hu"
-  )
+  const { data: adminUsers } = await query.graph({
+    entity: "user",
+    fields: ["email"],
+  })
+
+  const extraRecipients = (process.env.ADMIN_NOTIFICATION_EMAILS || "")
     .split(",")
     .map((e) => e.trim())
     .filter(Boolean)
+
+  const recipients = [
+    ...new Set(
+      [
+        ...adminUsers.map((u: { email?: string | null }) => u.email),
+        ...extraRecipients,
+      ]
+        .filter((e): e is string => Boolean(e))
+        .map((e) => e.toLowerCase())
+    ),
+  ]
 
   if (!recipients.length) return
 

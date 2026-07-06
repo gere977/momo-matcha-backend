@@ -26,6 +26,8 @@ import {
 type BarionOptions = {
   posKey: string
   environment: "test" | "prod"
+  // Barion requires Transactions[].Payee: the merchant wallet's email address.
+  payeeEmail?: string
   fundingSources?: string[]
   locale?: string
 }
@@ -123,7 +125,7 @@ class BarionProviderService extends AbstractPaymentProvider<BarionOptions> {
       Transactions: [
         {
           POSTransactionId: sessionId,
-          Payee: (context as any)?.barion_payee_email,
+          Payee: (context as any)?.barion_payee_email ?? this.options_.payeeEmail,
           Total: Number(amount),
         },
       ],
