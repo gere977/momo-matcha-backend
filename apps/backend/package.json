@@ -22,6 +22,8 @@
     "test:unit": "TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "@huggingface/inference": "^4.13.22",
     "@medusajs/admin-sdk": "2.17.0",
     "@medusajs/admin-shared": "2.17.0",
     "@medusajs/cache-redis": "2.17.0",
