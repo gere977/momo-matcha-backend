@@ -1,9 +1,7 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Container, Heading, Table, Text } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
-
-const MATCHA = "#6A8D53"
-const ACCENT = "#E06B85"
+import { ACCENT, Kpi, MATCHA, PageHeader, formatMoney } from "../../lib/ui"
 
 const ChartIcon = () => (
   <svg
@@ -39,6 +37,14 @@ type AnalyticsSummary = {
   }
   top_pages: { key: string; count: number }[]
   top_referrers: { key: string; count: number }[]
+  top_campaigns?: { key: string; count: number }[]
+  funnel?: {
+    sessions: number
+    product_views: number
+    cart: number
+    checkout: number
+    purchase: number
+  }
 }
 
 async function fetchSummary(): Promise<AnalyticsSummary> {
@@ -47,33 +53,61 @@ async function fetchSummary(): Promise<AnalyticsSummary> {
   return res.json()
 }
 
-function formatMoney(amount: number, currency?: string) {
-  try {
-    return new Intl.NumberFormat("hu-HU", {
-      style: "currency",
-      currency: (currency || "HUF").toUpperCase(),
-      maximumFractionDigits: 0,
-    }).format(amount ?? 0)
-  } catch {
-    return `${Math.round(amount ?? 0)} ${(currency || "").toUpperCase()}`
-  }
-}
+// Horizontal funnel bars: each step as a share of sessions.
+function Funnel({ funnel }: { funnel: NonNullable<AnalyticsSummary["funnel"]> }) {
+  const steps = [
+    { label: "Látogatás (munkamenet)", value: funnel.sessions },
+    { label: "Termékoldal megtekintés", value: funnel.product_views },
+    { label: "Kosár", value: funnel.cart },
+    { label: "Pénztár", value: funnel.checkout },
+    { label: "Vásárlás", value: funnel.purchase },
+  ]
+  const max = Math.max(1, funnel.sessions)
 
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <Container className="flex flex-col gap-1 p-4">
-      <Text size="small" className="text-ui-fg-subtle">
-        {label}
-      </Text>
-      <Heading level="h2" style={{ color: MATCHA }}>
-        {value}
-      </Heading>
-      {hint && (
-        <Text size="xsmall" className="text-ui-fg-muted">
-          {hint}
-        </Text>
-      )}
-    </Container>
+    <div className="flex flex-col gap-2">
+      {steps.map((s, i) => {
+        const pct = Math.round((s.value / max) * 100)
+        const dropoff =
+          i > 0 && steps[i - 1].value > 0
+            ? Math.round((s.value / steps[i - 1].value) * 100)
+            : null
+        return (
+          <div key={s.label} className="flex items-center gap-3">
+            <div style={{ width: 190, flexShrink: 0 }}>
+              <Text size="small">{s.label}</Text>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                background: "rgba(106,141,83,0.12)",
+                borderRadius: 6,
+                height: 26,
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.max(pct, s.value > 0 ? 2 : 0)}%`,
+                  background: MATCHA,
+                  height: "100%",
+                  borderRadius: 6,
+                }}
+              />
+            </div>
+            <div style={{ width: 150, flexShrink: 0, textAlign: "right" }}>
+              <Text size="small">
+                {s.value}
+                {dropoff !== null && (
+                  <span style={{ color: "#999" }}> · {dropoff}% továbblépés</span>
+                )}
+              </Text>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -188,17 +222,10 @@ const AnalyticsPage = () => {
 
   return (
     <Container className="flex flex-col gap-y-5 p-0">
-      <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: `2px solid ${MATCHA}` }}
-      >
-        <div>
-          <Heading level="h1">Statisztika</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            Látogatottság és értékesítés — elmúlt 30 nap
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        title="Statisztika"
+        subtitle="Látogatottság és értékesítés — elmúlt 30 nap"
+      />
 
       {isError && (
         <div className="px-6">
@@ -257,6 +284,17 @@ const AnalyticsPage = () => {
             </Container>
           </div>
 
+          {data.funnel && (
+            <div className="px-6">
+              <Heading level="h2" className="mb-2">
+                Vásárlási tölcsér (funnel)
+              </Heading>
+              <Container className="p-4">
+                <Funnel funnel={data.funnel} />
+              </Container>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 px-6 pb-6 md:grid-cols-2">
             <TopList
               title="Legnézettebb oldalak"
@@ -267,6 +305,11 @@ const AnalyticsPage = () => {
               title="Forgalmi források (referrer)"
               rows={data.top_referrers}
               emptyText="Még nincs külső hivatkozás."
+            />
+            <TopList
+              title="Kampányok (UTM forrás / kampány)"
+              rows={data.top_campaigns ?? []}
+              emptyText="Még nincs UTM-mel jelölt látogatás — használj utm_source/utm_campaign paramétereket a hirdetéseidben és posztjaidban."
             />
           </div>
         </>

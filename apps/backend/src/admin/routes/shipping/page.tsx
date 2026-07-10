@@ -1,8 +1,7 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Badge, Button, Container, Heading, Table, Text } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
-
-const MATCHA = "#6A8D53"
+import { MATCHA, PageHeader, formatMoney } from "../../lib/ui"
 
 // Inline icon (truck) — @medusajs/icons is not a declared backend dependency,
 // so it can't be imported here.
@@ -68,18 +67,6 @@ async function fetchOrders(): Promise<AdminOrder[]> {
   if (!res.ok) throw new Error(`Failed to load orders (${res.status})`)
   const data = await res.json()
   return (data.orders ?? []) as AdminOrder[]
-}
-
-function formatMoney(amount: number, currency?: string) {
-  try {
-    return new Intl.NumberFormat("hu-HU", {
-      style: "currency",
-      currency: (currency || "HUF").toUpperCase(),
-      maximumFractionDigits: 0,
-    }).format(amount ?? 0)
-  } catch {
-    return `${Math.round(amount ?? 0)} ${(currency || "").toUpperCase()}`
-  }
 }
 
 const FULFILLMENT_HU: Record<string, string> = {
@@ -226,24 +213,19 @@ const ShippingPage = () => {
 
   return (
     <Container className="flex flex-col gap-y-5 p-0">
-      <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: `2px solid ${MATCHA}` }}
-      >
-        <div>
-          <Heading level="h1">Szállítás</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            Csomagolásra és feladásra váró rendelések, címkenyomtatás
-          </Text>
-        </div>
-        {!isLoading && (
-          <div className="flex gap-2">
-            <Badge color="orange">{awaiting.length} feldolgozásra vár</Badge>
-            <Badge color="grey">GLS: {glsAwaiting}</Badge>
-            <Badge color="grey">FoxPost: {foxpostAwaiting}</Badge>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Szállítás"
+        subtitle="Csomagolásra és feladásra váró rendelések, címkenyomtatás"
+        right={
+          !isLoading ? (
+            <div className="flex gap-2">
+              <Badge color="orange">{awaiting.length} feldolgozásra vár</Badge>
+              <Badge color="grey">GLS: {glsAwaiting}</Badge>
+              <Badge color="grey">FoxPost: {foxpostAwaiting}</Badge>
+            </div>
+          ) : undefined
+        }
+      />
 
       {isError && (
         <div className="px-6">

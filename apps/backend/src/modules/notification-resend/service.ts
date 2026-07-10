@@ -176,6 +176,38 @@ function renderBody(template: string, data: Record<string, any>): string {
         ${button(`https://admin.momomatcha.hu/app/orders/${data.order_id ?? ""}`, "Rendelés megnyitása az adminban")}`
     }
 
+    case "review-request": {
+      const products = Array.isArray(data.products) ? data.products : []
+      const links = products
+        .map(
+          (p: any) =>
+            `<li style="margin:6px 0;"><a href="${p.url}" style="color:${MATCHA};font-weight:700;text-decoration:none;">${p.title}</a></li>`
+        )
+        .join("")
+      return `
+        ${h1("Hogy ízlett? 🍵")}
+        <p style="color:#666;">Pár napja megérkezett a <strong>#${data.order_number}</strong> számú rendelésed — reméljük, már meg is találtad benne a saját rituálédat. Sokat segítenél nekünk (és a többi matcharajongónak), ha megosztanád pár szóban, hogy ízlett!</p>
+        <ul style="color:#666;padding-left:18px;margin:14px 0;">${links}</ul>
+        <p style="color:#666;font-size:13px;">A linkre kattintva a termékoldalon tudod leadni az értékelésed — 2 perc az egész.</p>
+        ${products[0]?.url ? button(products[0].url, "Vélemény írása") : ""}`
+    }
+
+    case "abandoned-cart": {
+      const items = Array.isArray(data.items) ? data.items : []
+      const rows = items
+        .map(
+          (i: any) =>
+            `<tr><td style="padding:8px 0;border-bottom:1px solid #F0EBE0;font-size:14px;">${i.title ?? ""} <span style="color:#aaa;">× ${i.quantity ?? 1}</span></td></tr>`
+        )
+        .join("")
+      return `
+        ${h1("A kosarad még vár rád 🍵")}
+        <p style="color:#666;">Úgy láttuk, félbehagytad a rendelésed — a matchád még a kosaradban pihen. Ha kérdésed van a termékekről vagy a szállításról, írj bátran, szívesen segítünk!</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+        ${button(data.cart_url ?? STORE_URL, "Rendelés befejezése")}
+        <p style="color:#aaa;font-size:12px;margin-top:12px;">Tipp: 15 000 Ft feletti rendelésnél a szállítás ingyenes.</p>`
+    }
+
     case "welcome":
       return `
         <img src="${LIFESTYLE_URL}" alt="" width="100%" style="display:block;width:100%;border-radius:12px;margin:-10px 0 20px;" />

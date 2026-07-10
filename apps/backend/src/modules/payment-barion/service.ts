@@ -102,7 +102,21 @@ class BarionProviderService extends AbstractPaymentProvider<BarionOptions> {
         this.options_.posKey
       )}&PaymentId=${encodeURIComponent(paymentId)}`
     )
-    return response.json()
+    const json = await response.json()
+
+    // Without this check a Barion API error came back as `Status: undefined`
+    // and was silently mapped to "pending".
+    if (!response.ok || json.Errors?.length) {
+      this.logger_.error(
+        `[Barion] GetPaymentState for ${paymentId} failed: ${JSON.stringify(json)}`
+      )
+      throw new MedusaError(
+        MedusaError.Types.PAYMENT_AUTHORIZATION_ERROR,
+        `Barion GetPaymentState failed: ${json.Errors?.[0]?.Title ?? response.statusText}`
+      )
+    }
+
+    return json
   }
 
   async initiatePayment(input: InitiatePaymentInput): Promise<InitiatePaymentOutput> {

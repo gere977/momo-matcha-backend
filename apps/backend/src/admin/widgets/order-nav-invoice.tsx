@@ -1,6 +1,7 @@
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
-import { Badge, Container, Heading, Text, Copy } from "@medusajs/ui"
-import { useQuery } from "@tanstack/react-query"
+import { Badge, Button, Container, Heading, Text, Copy, toast } from "@medusajs/ui"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 
 const MATCHA = "#6A8D53"
 
@@ -44,6 +45,8 @@ function statusBadge(status?: string): {
 
 const OrderNavInvoiceWidget = ({ data: orderEntity }: OrderWidgetProps) => {
   const id = orderEntity.id
+  const queryClient = useQueryClient()
+  const [resubmitting, setResubmitting] = useState(false)
   const { data, isLoading } = useQuery({
     queryKey: ["order-nav-invoice", id],
     queryFn: () => fetchOrder(id),
@@ -52,7 +55,33 @@ const OrderNavInvoiceWidget = ({ data: orderEntity }: OrderWidgetProps) => {
 
   const order = data?.order
   const navStatus = order?.metadata?.nav_status as string | undefined
+  const navError = order?.metadata?.nav_error as string | undefined
   const txId = order?.metadata?.nav_transaction_id as string | undefined
+
+  const resubmit = async () => {
+    setResubmitting(true)
+    try {
+      const res = await fetch(`/admin/orders/${id}/nav-resubmit`, {
+        method: "POST",
+        credentials: "include",
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.ok && body.ok) {
+        toast.success(
+          body.already_submitted
+            ? "A számla már be volt küldve a NAV-hoz."
+            : "Számla sikeresen beküldve a NAV-hoz."
+        )
+      } else {
+        toast.error(body.message || "A NAV-beküldés nem sikerült.")
+      }
+    } catch {
+      toast.error("A NAV-beküldés nem sikerült (hálózati hiba).")
+    } finally {
+      setResubmitting(false)
+      queryClient.invalidateQueries({ queryKey: ["order-nav-invoice", id] })
+    }
+  }
   const invoiceNumber =
     order?.display_id != null ? `MOMO-${order.display_id}` : "—"
   const badge = statusBadge(navStatus)
@@ -99,12 +128,32 @@ const OrderNavInvoiceWidget = ({ data: orderEntity }: OrderWidgetProps) => {
               )}
             </div>
 
-            {!navStatus && (
-              <Text size="xsmall" className="text-ui-fg-muted">
-                A számla automatikusan beküldésre kerül a NAV-hoz a rendelés
-                leadásakor, amint a NAV technikai felhasználó adatai be vannak
-                állítva.
+            {navStatus === "failed" && navError && (
+              <Text size="xsmall" className="text-ui-fg-error">
+                Hiba: {navError}
               </Text>
+            )}
+
+            {!txId && (
+              <div className="flex flex-col gap-2">
+                <Button
+                  size="small"
+                  variant="secondary"
+                  isLoading={resubmitting}
+                  onClick={resubmit}
+                >
+                  {navStatus === "failed"
+                    ? "Beküldés újra a NAV-hoz"
+                    : "Beküldés a NAV-hoz most"}
+                </Button>
+                {!navStatus && (
+                  <Text size="xsmall" className="text-ui-fg-muted">
+                    A számla automatikusan beküldésre kerül a rendelés
+                    leadásakor, amint a NAV technikai felhasználó be van
+                    állítva — de innen kézzel is beküldheted.
+                  </Text>
+                )}
+              </div>
             )}
           </>
         )}

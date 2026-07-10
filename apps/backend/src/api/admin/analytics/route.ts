@@ -20,7 +20,16 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const pageViews: any[] = await analytics.listPageViews(
     { created_at: { $gte: since } },
     {
-      select: ["path", "referrer", "session_id", "created_at"],
+      select: [
+        "path",
+        "referrer",
+        "session_id",
+        "created_at",
+        "event",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+      ],
       take: 100000,
     }
   )
@@ -47,17 +56,51 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   )
   const pathCounts: Record<string, number> = {}
   const refCounts: Record<string, number> = {}
+  const campaignCounts: Record<string, number> = {}
   const allSessions = new Set<string>()
 
+  // Checkout funnel, derived per session from paths + explicit events.
+  const productSessions = new Set<string>()
+  const cartSessions = new Set<string>()
+  const checkoutSessions = new Set<string>()
+  const purchaseSessions = new Set<string>()
+
   for (const pv of pageViews) {
-    const key = dayKey(pv.created_at)
-    if (key in viewsByDay) {
-      viewsByDay[key]++
-      if (pv.session_id) sessionsByDay[key].add(pv.session_id)
+    const isPageView = !pv.event || pv.event === "page_view"
+
+    if (isPageView) {
+      const key = dayKey(pv.created_at)
+      if (key in viewsByDay) {
+        viewsByDay[key]++
+        if (pv.session_id) sessionsByDay[key].add(pv.session_id)
+      }
+      if (pv.session_id) allSessions.add(pv.session_id)
+      pathCounts[pv.path] = (pathCounts[pv.path] ?? 0) + 1
     }
-    if (pv.session_id) allSessions.add(pv.session_id)
-    pathCounts[pv.path] = (pathCounts[pv.path] ?? 0) + 1
-    if (pv.referrer) {
+
+    if (pv.session_id) {
+      if (isPageView && pv.path.includes("/products/")) {
+        productSessions.add(pv.session_id)
+      }
+      if (pv.event === "add_to_cart" || (isPageView && /\/cart(\/|$|\?)/.test(pv.path))) {
+        cartSessions.add(pv.session_id)
+      }
+      if (pv.event === "begin_checkout" || (isPageView && pv.path.includes("/checkout"))) {
+        checkoutSessions.add(pv.session_id)
+      }
+      if (pv.event === "purchase" || (isPageView && pv.path.includes("/confirmed"))) {
+        purchaseSessions.add(pv.session_id)
+      }
+    }
+
+    if (pv.utm_source || pv.utm_campaign) {
+      const campaignKey = [pv.utm_source ?? "-", pv.utm_campaign ?? "-"]
+        .join(" / ")
+        .slice(0, 120)
+      campaignCounts[campaignKey] = (campaignCounts[campaignKey] ?? 0) + 1
+    }
+
+    if (isPageView && pv.referrer) {
       let host = pv.referrer
       try {
         host = new URL(pv.referrer).hostname
@@ -111,5 +154,13 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     },
     top_pages: top(pathCounts, 10),
     top_referrers: top(refCounts, 10),
+    top_campaigns: top(campaignCounts, 10),
+    funnel: {
+      sessions: allSessions.size,
+      product_views: productSessions.size,
+      cart: cartSessions.size,
+      checkout: checkoutSessions.size,
+      purchase: purchaseSessions.size,
+    },
   })
 }

@@ -29,6 +29,10 @@ module.exports = defineConfig({
       // First-party pageview analytics (admin "Statisztika" page)
       resolve: './src/modules/analytics-lite',
     },
+    {
+      // Reviews + waitlist signups (admin "Vélemények", storefront reviews)
+      resolve: './src/modules/crm-lite',
+    },
     ...(useRedisModules
       ? [
           {

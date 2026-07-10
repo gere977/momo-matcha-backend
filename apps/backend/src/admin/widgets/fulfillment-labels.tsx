@@ -34,15 +34,20 @@ const FulfillmentLabelsWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
 
   const active = fulfillments.filter((f) => !f.canceled_at)
 
-  if (!active.length) {
-    return null
-  }
-
   return (
     <Container className="divide-y p-0">
       <div className="px-6 py-4">
         <Heading level="h2">Szállítási címkék</Heading>
       </div>
+      {!active.length && (
+        <div className="px-6 py-4">
+          <Text size="small" className="text-ui-fg-subtle">
+            Még nincs teljesítés ehhez a rendeléshez. Előbb teljesítsd a
+            tételeket a „Fulfill items" gombbal — a GLS/FoxPost címke utána
+            innen tölthető le.
+          </Text>
+        </div>
+      )}
       {active.map((fulfillment) => {
         const barcode = fulfillment.data?.foxpost_barcode as string | undefined
         const parcelNumber = fulfillment.data?.gls_parcel_number as

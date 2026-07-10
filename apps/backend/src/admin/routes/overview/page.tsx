@@ -1,9 +1,7 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Badge, Container, Heading, Text, Table } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
-
-// Momo Matcha brand accent — used sparingly so the page still feels native.
-const MATCHA = "#6A8D53"
+import { Kpi, PageHeader, formatMoney } from "../../lib/ui"
 
 // Inline sidebar icon (a small bar chart) — avoids importing @medusajs/icons,
 // which is not a declared dependency of the backend package and therefore
@@ -43,14 +41,27 @@ type AdminOrder = {
 const ORDER_FIELDS =
   "id,display_id,status,fulfillment_status,payment_status,total,currency_code,created_at,email"
 
-async function fetchOrders(): Promise<AdminOrder[]> {
+type OrdersResult = { orders: AdminOrder[]; count: number }
+
+async function fetchOrders(query = ""): Promise<OrdersResult> {
   const res = await fetch(
-    `/admin/orders?limit=100&order=-created_at&fields=${ORDER_FIELDS}`,
+    `/admin/orders?limit=100&order=-created_at&fields=${ORDER_FIELDS}${query}`,
     { credentials: "include" }
   )
   if (!res.ok) throw new Error(`Failed to load orders (${res.status})`)
   const data = await res.json()
-  return (data.orders ?? []) as AdminOrder[]
+  return {
+    orders: (data.orders ?? []) as AdminOrder[],
+    count: Number(data.count ?? 0),
+  }
+}
+
+// Today's orders are filtered server-side, so the KPIs stay correct even
+// once the shop has more than the 100 most recent orders loaded here.
+function startOfTodayIso() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
 }
 
 const LOW_STOCK_THRESHOLD = 5
@@ -78,18 +89,6 @@ function availableQty(item: InventoryItem): number | null {
   return item.stocked_quantity - (item.reserved_quantity ?? 0)
 }
 
-function formatMoney(amount: number, currency?: string) {
-  try {
-    return new Intl.NumberFormat("hu-HU", {
-      style: "currency",
-      currency: (currency || "HUF").toUpperCase(),
-      maximumFractionDigits: 0,
-    }).format(amount ?? 0)
-  } catch {
-    return `${Math.round(amount ?? 0)} ${(currency || "").toUpperCase()}`
-  }
-}
-
 const AWAITING = new Set(["not_fulfilled", "partially_fulfilled"])
 
 function fulfillmentBadgeColor(
@@ -103,41 +102,22 @@ function fulfillmentBadgeColor(
   return "grey"
 }
 
-function Kpi({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <Container className="flex flex-col gap-1 p-4">
-      <Text size="small" className="text-ui-fg-subtle">
-        {label}
-      </Text>
-      <Heading level="h2" style={{ color: MATCHA }}>
-        {value}
-      </Heading>
-      {hint && (
-        <Text size="xsmall" className="text-ui-fg-muted">
-          {hint}
-        </Text>
-      )}
-    </Container>
-  )
-}
-
 const OverviewPage = () => {
-  const { data: orders = [], isLoading, isError } = useQuery({
+  const { data: recentData, isLoading, isError } = useQuery({
     queryKey: ["overview-orders"],
-    queryFn: fetchOrders,
+    queryFn: () => fetchOrders(),
+  })
+  const { data: todayData } = useQuery({
+    queryKey: ["overview-orders-today"],
+    queryFn: () => fetchOrders(`&created_at[$gte]=${startOfTodayIso()}`),
   })
   const { data: inventory = [] } = useQuery({
     queryKey: ["overview-inventory"],
     queryFn: fetchInventory,
   })
+
+  const orders = recentData?.orders ?? []
+  const totalCount = recentData?.count ?? 0
 
   const lowStock = inventory
     .map((item) => ({ item, available: availableQty(item) }))
@@ -146,11 +126,8 @@ const OverviewPage = () => {
     )
     .sort((a, b) => (a.available ?? 0) - (b.available ?? 0))
 
-  const startOfToday = new Date()
-  startOfToday.setHours(0, 0, 0, 0)
-
-  const todaysOrders = orders.filter(
-    (o) => new Date(o.created_at) >= startOfToday && o.status !== "canceled"
+  const todaysOrders = (todayData?.orders ?? []).filter(
+    (o) => o.status !== "canceled"
   )
   const currency = orders[0]?.currency_code || "HUF"
   const todaysRevenue = todaysOrders.reduce((sum, o) => sum + (o.total ?? 0), 0)
@@ -159,22 +136,17 @@ const OverviewPage = () => {
 
   return (
     <Container className="flex flex-col gap-y-4 p-0">
-      <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: `2px solid ${MATCHA}` }}
-      >
-        <div>
-          <Heading level="h1">Momo Matcha — Áttekintés</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            A webshop napi állapota egy pillantással
-          </Text>
-        </div>
-        {!isLoading && (
-          <Badge color="green" size="small">
-            {orders.length} rendelés összesen
-          </Badge>
-        )}
-      </div>
+      <PageHeader
+        title="Momo Matcha — Áttekintés"
+        subtitle="A webshop napi állapota egy pillantással"
+        right={
+          !isLoading ? (
+            <Badge color="green" size="small">
+              {totalCount} rendelés összesen
+            </Badge>
+          ) : undefined
+        }
+      />
 
       {isError && (
         <div className="px-6">
@@ -187,12 +159,12 @@ const OverviewPage = () => {
       <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-4">
         <Kpi
           label="Mai rendelések"
-          value={isLoading ? "…" : String(todaysOrders.length)}
+          value={todayData ? String(todaysOrders.length) : "…"}
           hint="Ma leadott, nem törölt"
         />
         <Kpi
           label="Mai bevétel"
-          value={isLoading ? "…" : formatMoney(todaysRevenue, currency)}
+          value={todayData ? formatMoney(todaysRevenue, currency) : "…"}
           hint="Mai rendelések összértéke"
         />
         <Kpi
@@ -272,7 +244,14 @@ const OverviewPage = () => {
               )}
               {recent.map((o) => (
                 <Table.Row key={o.id}>
-                  <Table.Cell>#{o.display_id}</Table.Cell>
+                  <Table.Cell>
+                    <a
+                      href={`/app/orders/${o.id}`}
+                      style={{ fontWeight: 600 }}
+                    >
+                      #{o.display_id}
+                    </a>
+                  </Table.Cell>
                   <Table.Cell>{o.email}</Table.Cell>
                   <Table.Cell>
                     <Badge

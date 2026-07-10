@@ -10,8 +10,7 @@ import {
 } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
-
-const MATCHA = "#6A8D53"
+import { PageHeader } from "../../lib/ui"
 
 const SparkleIcon = () => (
   <svg
@@ -184,17 +183,10 @@ const AiStudioPage = () => {
 
   return (
     <Container className="flex flex-col gap-y-5 p-0">
-      <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: `2px solid ${MATCHA}` }}
-      >
-        <div>
-          <Heading level="h1">AI Stúdió</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            Termékkép-generálás: kutatás → generálás → AI értékelés → mentés
-          </Text>
-        </div>
-      </div>
+      <PageHeader
+        title="AI Stúdió"
+        subtitle="Termékkép-generálás: kutatás → generálás → AI értékelés → mentés"
+      />
 
       {error && (
         <div className="px-6">
