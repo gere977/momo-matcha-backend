@@ -1,6 +1,7 @@
 import type { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { ANALYTICS_LITE_MODULE } from "../modules/analytics-lite"
+import { CRM_LITE_MODULE } from "../modules/crm-lite"
 
 const RETENTION_DAYS = 90
 const BATCH = 5000
@@ -32,6 +33,26 @@ export default async function prunePageViewsJob(container: MedusaContainer) {
     logger.info(
       `[analytics] Pruned ${totalDeleted} page_view rows older than ${RETENTION_DAYS} days.`
     )
+  }
+
+  // Marketing images (base64 in DB) only need to live long enough for Meta
+  // to fetch them — 30 days is generous.
+  try {
+    const crm = container.resolve(CRM_LITE_MODULE) as any
+    const assetCutoff = new Date()
+    assetCutoff.setDate(assetCutoff.getDate() - 30)
+    const oldAssets: { id: string }[] = await crm.listMarketingAssets(
+      { created_at: { $lt: assetCutoff } },
+      { select: ["id"], take: 1000 }
+    )
+    if (oldAssets.length) {
+      await crm.deleteMarketingAssets(oldAssets.map((a) => a.id))
+      logger.info(
+        `[marketing] Pruned ${oldAssets.length} marketing assets older than 30 days.`
+      )
+    }
+  } catch (e: any) {
+    logger.error(`[marketing] Asset pruning failed: ${e?.message}`)
   }
 }
 
