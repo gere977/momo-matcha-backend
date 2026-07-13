@@ -1,7 +1,15 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Container, Heading, Table, Text } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
-import { ACCENT, Kpi, MATCHA, PageHeader, formatMoney } from "../../lib/ui"
+import { useState } from "react"
+import {
+  CHART_GREEN,
+  CHART_PINK,
+  Kpi,
+  PageHeader,
+  formatMoney,
+  formatNumber,
+} from "../../lib/ui"
 
 const ChartIcon = () => (
   <svg
@@ -78,29 +86,23 @@ function Funnel({ funnel }: { funnel: NonNullable<AnalyticsSummary["funnel"]> })
               <Text size="small">{s.label}</Text>
             </div>
             <div
-              style={{
-                flex: 1,
-                background: "rgba(106,141,83,0.12)",
-                borderRadius: 6,
-                height: 26,
-                position: "relative",
-                overflow: "hidden",
-              }}
+              className="relative flex-1 overflow-hidden rounded-md bg-ui-bg-subtle"
+              style={{ height: 26 }}
             >
               <div
                 style={{
                   width: `${Math.max(pct, s.value > 0 ? 2 : 0)}%`,
-                  background: MATCHA,
+                  background: CHART_GREEN,
                   height: "100%",
                   borderRadius: 6,
                 }}
               />
             </div>
-            <div style={{ width: 150, flexShrink: 0, textAlign: "right" }}>
-              <Text size="small">
-                {s.value}
+            <div style={{ width: 170, flexShrink: 0, textAlign: "right" }}>
+              <Text size="small" className="tabular-nums">
+                {formatNumber(s.value)}
                 {dropoff !== null && (
-                  <span style={{ color: "#999" }}> · {dropoff}% továbblépés</span>
+                  <span className="text-ui-fg-muted"> · {dropoff}% továbblépés</span>
                 )}
               </Text>
             </div>
@@ -111,7 +113,23 @@ function Funnel({ funnel }: { funnel: NonNullable<AnalyticsSummary["funnel"]> })
   )
 }
 
-// Dependency-free daily bar chart
+// Round the axis max up to a "nice" number (1/2/5 × power of ten) so the
+// gridline values are readable instead of arbitrary data maxima.
+function niceCeil(v: number) {
+  const pow = 10 ** Math.floor(Math.log10(v))
+  const n = v / pow
+  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10
+  return step * pow
+}
+
+const compactHu = new Intl.NumberFormat("hu-HU", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+})
+
+// Dependency-free daily bar chart: recessive y-gridlines with compact value
+// labels, and a hover tooltip with the exact value (full-column hit targets,
+// larger than the marks themselves).
 function BarChart({
   days,
   values,
@@ -123,51 +141,111 @@ function BarChart({
   color: string
   formatValue?: (v: number) => string
 }) {
+  const [hover, setHover] = useState<number | null>(null)
+
   const width = 900
   const height = 180
-  const pad = 4
-  const max = Math.max(1, ...values)
-  const barW = (width - pad * 2) / values.length
+  const padTop = 14
+  const niceMax = niceCeil(Math.max(1, ...values))
+  const barW = width / values.length
+  const y = (v: number) => height - (v / niceMax) * (height - padTop)
+  const ticks = [niceMax / 2, niceMax]
+  const fmt = (v: number) => (formatValue ? formatValue(v) : formatNumber(v))
 
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height + 22}`}
-      style={{ width: "100%", height: "auto", display: "block" }}
-    >
-      {values.map((v, i) => {
-        const h = Math.round((v / max) * (height - 10))
-        const x = pad + i * barW
-        const showLabel = i % 5 === 0 || i === values.length - 1
-        return (
-          <g key={days[i]}>
-            <rect
-              x={x + 1}
-              y={height - h}
-              width={Math.max(1, barW - 2)}
-              height={h}
-              rx={2}
-              fill={color}
-              opacity={0.85}
+    <div className="relative" onMouseLeave={() => setHover(null)}>
+      <svg
+        viewBox={`0 0 ${width} ${height + 22}`}
+        style={{ width: "100%", height: "auto", display: "block" }}
+      >
+        {/* Recessive grid: baseline + two value lines, labels in muted ink. */}
+        <line
+          x1={0}
+          x2={width}
+          y1={height}
+          y2={height}
+          className="stroke-ui-border-base"
+          strokeWidth={1}
+        />
+        {ticks.map((t) => (
+          <g key={t}>
+            <line
+              x1={0}
+              x2={width}
+              y1={y(t)}
+              y2={y(t)}
+              className="stroke-ui-border-base"
+              strokeWidth={1}
+              strokeDasharray="2 4"
+            />
+            <text
+              x={2}
+              y={y(t) - 4}
+              fontSize="9"
+              className="fill-ui-fg-muted tabular-nums"
             >
-              <title>
-                {days[i]}: {formatValue ? formatValue(v) : v}
-              </title>
-            </rect>
-            {showLabel && (
-              <text
-                x={x + barW / 2}
-                y={height + 14}
-                textAnchor="middle"
-                fontSize="9"
-                fill="#999"
-              >
-                {days[i].slice(5)}
-              </text>
-            )}
+              {compactHu.format(t)}
+            </text>
           </g>
-        )
-      })}
-    </svg>
+        ))}
+        {values.map((v, i) => {
+          const h = Math.max(v > 0 ? 2 : 0, height - y(v))
+          const x = i * barW
+          const showLabel = i % 5 === 0 || i === values.length - 1
+          return (
+            <g key={days[i]}>
+              <rect
+                x={x + 1}
+                y={height - h}
+                width={Math.max(1, barW - 2)}
+                height={h}
+                rx={2}
+                fill={color}
+                opacity={hover === null ? 0.85 : hover === i ? 1 : 0.4}
+              />
+              {/* Full-column hit target — bigger than the mark. */}
+              <rect
+                x={x}
+                y={0}
+                width={barW}
+                height={height}
+                fill="transparent"
+                onMouseEnter={() => setHover(i)}
+              />
+              {showLabel && (
+                <text
+                  x={x + barW / 2}
+                  y={height + 14}
+                  textAnchor="middle"
+                  fontSize="9"
+                  className="fill-ui-fg-muted"
+                >
+                  {days[i].slice(5)}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+      {hover !== null && (
+        <div
+          className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-md border border-ui-border-base bg-ui-bg-base px-2 py-1 shadow-elevation-flyout"
+          style={{
+            left: `${Math.min(
+              92,
+              Math.max(8, ((hover + 0.5) / values.length) * 100)
+            )}%`,
+          }}
+        >
+          <Text size="xsmall" className="block text-ui-fg-subtle">
+            {days[hover]}
+          </Text>
+          <Text size="small" className="block font-medium tabular-nums">
+            {fmt(values[hover])}
+          </Text>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -238,25 +316,34 @@ const AnalyticsPage = () => {
       <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-5">
         <Kpi
           label="Oldalmegtekintés"
-          value={isLoading ? "…" : String(data?.totals.views ?? 0)}
+          value={formatNumber(data?.totals.views ?? 0)}
           hint="30 nap"
+          loading={isLoading}
         />
         <Kpi
           label="Látogató (munkamenet)"
-          value={isLoading ? "…" : String(data?.totals.sessions ?? 0)}
+          value={formatNumber(data?.totals.sessions ?? 0)}
           hint="Egyedi böngésző-munkamenetek"
+          loading={isLoading}
         />
         <Kpi
           label="Rendelések"
-          value={isLoading ? "…" : String(data?.totals.orders ?? 0)}
+          value={formatNumber(data?.totals.orders ?? 0)}
           hint="Nem törölt rendelések"
+          loading={isLoading}
         />
         <Kpi
           label="Bevétel"
-          value={isLoading ? "…" : formatMoney(data?.totals.revenue ?? 0, currency)}
+          value={formatMoney(data?.totals.revenue ?? 0, currency)}
           hint="30 nap"
+          loading={isLoading}
         />
-        <Kpi label="Konverzió" value={isLoading ? "…" : conversion} hint="Rendelés / látogató" />
+        <Kpi
+          label="Konverzió"
+          value={conversion}
+          hint="Rendelés / látogató"
+          loading={isLoading}
+        />
       </div>
 
       {data && (
@@ -266,7 +353,7 @@ const AnalyticsPage = () => {
               Napi oldalmegtekintések
             </Heading>
             <Container className="p-4">
-              <BarChart days={data.days} values={data.views_by_day} color={MATCHA} />
+              <BarChart days={data.days} values={data.views_by_day} color={CHART_GREEN} />
             </Container>
           </div>
 
@@ -278,7 +365,7 @@ const AnalyticsPage = () => {
               <BarChart
                 days={data.days}
                 values={data.revenue_by_day}
-                color={ACCENT}
+                color={CHART_PINK}
                 formatValue={(v) => formatMoney(v, currency)}
               />
             </Container>
