@@ -295,7 +295,7 @@ const AnalyticsPage = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 px-6 pb-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-2">
             <TopList
               title="Legnézettebb oldalak"
               rows={data.top_pages}
@@ -314,6 +314,35 @@ const AnalyticsPage = () => {
           </div>
         </>
       )}
+
+      <div className="px-6 pb-6">
+        <Container className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <Heading level="h2">Vercel Web Analytics</Heading>
+            <Text className="text-ui-fg-subtle" size="small">
+              Független, sütimentes mérés a Vercelen (Core Web Vitals és
+              látogatottság) — kiegészíti a fenti saját statisztikát.
+            </Text>
+          </div>
+          <a
+            href="https://vercel.com/gere977s-projects/momo-matcha-storefront/analytics"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border border-ui-border-base bg-ui-bg-base px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-ui-bg-base-hover"
+          >
+            Megnyitás a Vercelen
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M7 13 13 7M8 7h5v5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
+        </Container>
+      </div>
     </Container>
   )
 }
