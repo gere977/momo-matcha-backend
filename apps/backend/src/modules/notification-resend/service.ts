@@ -14,22 +14,27 @@ type InjectedDependencies = {
   logger: Logger
 }
 
-// Brand palette (matches the storefront's warm genZ rebrand)
-const MATCHA = "#7C9B5E"
-const ACCENT = "#E06B85"
-const CREAM = "#F1EDE4"
-const KRAFT = "#E3D6C4"
+// Product-page palette, translated to email-safe solid colors.
+const MATCHA = "#6A8D53"
+const DARK = "#234C38"
+const ACCENT = "#F4748B"
+const CREAM = "#F7F2E8"
+const PAPER = "#FFFDF7"
+const KRAFT = "#DED2BF"
+const MUTED = "#697066"
+const VANILLA = "#F3DFC0"
 const STORE_URL = "https://momomatcha.hu"
-const LOGO_URL = `${STORE_URL}/images/logo.jpg`
-// Email-compressed hero (public/images/email-hero.jpg in the storefront) —
-// the full lifestyle PNG is ~365KB, too heavy for an inbox.
-const HERO_URL = `${STORE_URL}/images/email-hero.jpg`
+const LOGO_URL = `${STORE_URL}/images/logo-transparent.png`
+// The welcome email is the only image-led template. It uses the same tin-can
+// splash artwork as the new storefront instead of the old generic tea field.
+const HERO_URL = `${STORE_URL}/images/products/momo-original-splash-card.png`
 const CONTACT = "info@momomatcha.hu"
 
 // Brand-adjacent, email-client-safe font stacks. Webfonts (Nunito/Quicksand)
 // don't load in Gmail/Outlook; Trebuchet MS is the closest rounded sans that
 // ships everywhere.
 const FONT = "'Trebuchet MS',Verdana,Arial,Helvetica,sans-serif"
+const EDITORIAL = "Georgia,'Times New Roman',serif"
 
 // Marketing-type templates get an opt-out footer + List-Unsubscribe header;
 // transactional ones (receipts, resets) must not.
@@ -66,17 +71,17 @@ function formatMoney(amount: number, currency?: string) {
 // plain-link fallback for clients that mangle buttons.
 function button(url: string, label: string, withFallback = false) {
   const fallback = withFallback
-    ? `<p style="font-size:12px;color:#aaa;margin:2px 0 0;word-break:break-all;">Ha a gomb nem működik, másold a böngésződbe: <a href="${esc(
+    ? `<p style="font-size:12px;color:#8B8F87;margin:8px 0 0;word-break:break-all;line-height:1.6;">Ha a gomb nem működik, másold a böngésződbe: <a href="${esc(
         url
-      )}" style="color:${MATCHA};">${esc(url)}</a></p>`
+      )}" style="color:${DARK};">${esc(url)}</a></p>`
     : ""
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px;">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 8px;">
     <tr><td style="border-radius:9999px;background:${ACCENT};">
       <a href="${esc(
         url
-      )}" style="display:inline-block;padding:13px 34px;font-family:${FONT};font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:9999px;">${esc(
+      )}" style="display:inline-block;padding:15px 30px;font-family:${FONT};font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:9999px;letter-spacing:.1px;">${esc(
         label
-      )}</a>
+      )}&nbsp;&nbsp;→</a>
     </td></tr></table>${fallback}`
 }
 
@@ -84,30 +89,50 @@ function button(url: string, label: string, withFallback = false) {
 // preheader for the inbox preview line.
 function layout(bodyHtml: string, preheader = "", marketing = false) {
   const optOut = marketing
-    ? `<br>Nem szeretnél több ilyen levelet? Írj nekünk a <a href="mailto:${CONTACT}?subject=Leiratkozas" style="color:${MATCHA};text-decoration:none;">${CONTACT}</a> címre, és leveszünk a listáról.`
+    ? `<br><span style="display:inline-block;margin-top:8px;">Nem szeretnél több ilyen levelet? <a href="mailto:${CONTACT}?subject=Leiratkozas" style="color:${VANILLA};text-decoration:underline;text-underline-offset:3px;">Itt jelezheted.</a></span>`
     : ""
   return `<!DOCTYPE html>
-<html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
+<html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+<style>
+  @media only screen and (max-width:620px) {
+    .email-shell { width:100% !important; max-width:100% !important; }
+    .email-pad { padding-left:24px !important; padding-right:24px !important; }
+    .email-title { font-size:34px !important; line-height:1.05 !important; }
+  }
+</style></head>
 <body style="margin:0;padding:0;background:${CREAM};">
   <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${esc(
     preheader
   )}</span>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CREAM};padding:28px 0;">
-    <tr><td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:92%;">
-        <tr><td align="center" style="padding:6px 0 22px;">
-          <img src="${LOGO_URL}" width="84" height="84" alt="Momo Matcha" style="display:block;margin:0 auto;border-radius:16px;border:1px solid ${KRAFT};" />
-          <div style="font-family:${FONT};font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#A08D6E;margin-top:8px;">Rituálék a lassú élethez</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:${CREAM};">
+    <tr><td align="center" style="background:${MATCHA};padding:9px 18px;font-family:${FONT};font-size:12px;font-weight:700;color:#ffffff;letter-spacing:.15px;">🍵 &nbsp;Ingyenes szállítás 15 000 Ft feletti rendelésre</td></tr>
+    <tr><td align="center" style="padding:30px 14px 34px;">
+      <table role="presentation" width="620" cellpadding="0" cellspacing="0" class="email-shell" style="width:620px;max-width:100%;">
+        <tr><td align="center" style="padding:4px 0 22px;">
+          <a href="${STORE_URL}" style="text-decoration:none;">
+            <img src="${LOGO_URL}" width="116" height="80" alt="Momo Matcha" style="display:block;width:116px;height:80px;object-fit:contain;margin:0 auto;border:0;" />
+          </a>
+          <table role="presentation" width="210" cellpadding="0" cellspacing="0" style="width:210px;margin:8px auto 0;"><tr>
+            <td style="height:1px;background:${KRAFT};font-size:0;line-height:0;">&nbsp;</td>
+            <td width="34" align="center"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#E84B3C;font-size:0;line-height:0;">&nbsp;</span></td>
+            <td style="height:1px;background:${KRAFT};font-size:0;line-height:0;">&nbsp;</td>
+          </tr></table>
+          <div style="font-family:${FONT};font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${DARK};margin-top:9px;">Japánból, gonddal</div>
         </td></tr>
-        <tr><td style="background:#ffffff;border:1px solid ${KRAFT};border-radius:14px;padding:34px;font-family:${FONT};color:#3a3a3a;line-height:1.6;">
+        <tr><td style="background:${PAPER};border-radius:28px 28px 0 0;padding:12px 42px 0;" class="email-pad">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="height:7px;background:${ACCENT};border-radius:999px;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+        </td></tr>
+        <tr><td class="email-pad" style="background:${PAPER};padding:38px 42px 44px;font-family:${FONT};font-size:15px;color:${MUTED};line-height:1.7;">
           ${bodyHtml}
         </td></tr>
-        <tr><td align="center" style="padding:22px 14px;font-family:${FONT};font-size:12px;color:#9b9b9b;line-height:1.7;">
-          <a href="${STORE_URL}" style="color:${MATCHA};text-decoration:none;">momomatcha.hu</a>
-          &nbsp;·&nbsp;
-          <a href="mailto:${CONTACT}" style="color:${MATCHA};text-decoration:none;">${CONTACT}</a>
+        <tr><td align="center" style="background:${DARK};border-radius:0 0 28px 28px;padding:28px 24px 30px;font-family:${FONT};font-size:12px;color:#D8E0D4;line-height:1.75;">
+          <div style="font-family:${EDITORIAL};font-size:19px;font-weight:700;color:#ffffff;margin-bottom:5px;">Egy nyugodt pillanat.</div>
+          <div style="color:#BFCBB9;margin-bottom:14px;">A mindennapi matcha-rituáléd.</div>
+          <a href="${STORE_URL}" style="color:${VANILLA};font-weight:700;text-decoration:none;">momomatcha.hu</a>
+          &nbsp;&nbsp;·&nbsp;&nbsp;
+          <a href="mailto:${CONTACT}" style="color:${VANILLA};font-weight:700;text-decoration:none;">${CONTACT}</a>
           ${optOut}<br>
-          © ${new Date().getFullYear()} Momo Matcha. Minden jog fenntartva.
+          <span style="display:inline-block;margin-top:12px;color:#91A08B;">© ${new Date().getFullYear()} Momo Matcha</span>
         </td></tr>
       </table>
     </td></tr>
@@ -116,16 +141,17 @@ function layout(bodyHtml: string, preheader = "", marketing = false) {
 }
 
 function h1(text: string) {
-  return `<h1 style="margin:0 0 8px;font-family:${FONT};font-size:24px;font-weight:700;color:${MATCHA};">${text}</h1>`
+  return `<div style="margin:0 0 10px;font-family:${FONT};font-size:10px;font-weight:700;letter-spacing:2.4px;text-transform:uppercase;color:${ACCENT};">Momo Matcha · Japán</div>
+  <h1 class="email-title" style="margin:0 0 16px;font-family:${EDITORIAL};font-size:40px;line-height:1.08;letter-spacing:-.8px;font-weight:700;color:${DARK};">${text}</h1>`
 }
 
 function summaryRow(label: string, value: string, bold = false) {
   const strong = bold
-    ? `font-weight:700;color:${MATCHA};font-size:16px;`
-    : "color:#666;"
+    ? `font-family:${EDITORIAL};font-weight:700;color:${DARK};font-size:20px;`
+    : `color:${MUTED};`
   return `<tr>
-    <td style="padding:4px 0;font-size:14px;color:#666;">${label}</td>
-    <td style="padding:4px 0;font-size:14px;text-align:right;${strong}">${value}</td>
+    <td style="padding:6px 0;font-size:14px;color:${MUTED};">${label}</td>
+    <td style="padding:6px 0;font-size:14px;text-align:right;${strong}">${value}</td>
   </tr>`
 }
 
@@ -136,12 +162,12 @@ function infoBlock(rows: Array<[string, string | null | undefined]>) {
   const trs = filled
     .map(
       ([label, value]) => `<tr>
-        <td style="padding:3px 12px 3px 0;font-size:13px;color:#999;white-space:nowrap;vertical-align:top;">${label}</td>
-        <td style="padding:3px 0;font-size:13px;color:#555;">${esc(value)}</td>
+        <td style="padding:4px 14px 4px 0;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:${MATCHA};white-space:nowrap;vertical-align:top;">${label}</td>
+        <td style="padding:4px 0;font-size:13px;color:${DARK};">${esc(value)}</td>
       </tr>`
     )
     .join("")
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0 0;background:#FAF7F0;border-radius:10px;"><tr><td style="padding:12px 16px;">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 0;background:#F0F4EB;border-left:4px solid ${MATCHA};border-radius:0 14px 14px 0;"><tr><td style="padding:16px 18px;">
     <table role="presentation" cellpadding="0" cellspacing="0">${trs}</table>
   </td></tr></table>`
 }
@@ -156,14 +182,16 @@ function itemRows(items: any[], cur?: string, withPrice = true) {
           ? i.unit_price * (i.quantity ?? 1)
           : null
       const price = withPrice
-        ? `<td style="padding:11px 0;border-bottom:1px solid #F0EBE0;font-size:14px;text-align:right;white-space:nowrap;">${
+        ? `<td width="30%" valign="top" style="width:30%;padding:14px 0 14px 12px;border-bottom:1px solid ${KRAFT};font-size:14px;font-weight:700;color:${DARK};text-align:right;white-space:nowrap;">${
             line != null ? formatMoney(line, cur) : ""
           }</td>`
         : ""
       return `<tr>
-        <td style="padding:11px 0;border-bottom:1px solid #F0EBE0;font-size:14px;">${esc(
+        <td width="${withPrice ? "70%" : "100%"}" valign="top" style="width:${
+          withPrice ? "70%" : "100%"
+        };padding:14px 0;border-bottom:1px solid ${KRAFT};font-size:14px;font-weight:700;color:${DARK};word-break:break-word;">${esc(
           i.title
-        )} <span style="color:#aaa;">× ${esc(i.quantity ?? 1)}</span></td>
+        )} <span style="font-weight:400;color:#8B8F87;">× ${esc(i.quantity ?? 1)}</span></td>
         ${price}
       </tr>`
     })
@@ -193,13 +221,13 @@ function renderBody(template: string, data: Record<string, any>): string {
         typeof data.discount_total === "number" && data.discount_total > 0
           ? summaryRow("Kedvezmény", "-" + formatMoney(data.discount_total, cur))
           : "",
-        `<tr><td colspan="2" style="border-top:2px solid ${KRAFT};padding-top:6px;"></td></tr>`,
+        `<tr><td colspan="2" style="border-top:2px solid ${DARK};padding-top:8px;"></td></tr>`,
         summaryRow("Végösszeg", formatMoney(data.total, cur), true),
       ].join("")
 
       return `
         ${h1("Köszönjük a rendelésed! 🍵")}
-        <p style="margin:0 0 22px;color:#666;">Visszaigazoltuk a <strong>#${esc(
+        <p style="margin:0 0 22px;color:${MUTED};">Visszaigazoltuk a <strong style="color:${DARK};">#${esc(
           data.order_number
         )}</strong> számú rendelésed — hamarosan gondosan összekészítjük, és értesítünk, amint úton van.</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${itemRows(
@@ -207,7 +235,7 @@ function renderBody(template: string, data: Record<string, any>): string {
           cur
         )}</table>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">${summary}</table>
-        <p style="font-size:12px;color:#aaa;margin:8px 0 0;">Az árak tartalmazzák az ÁFÁ-t.</p>
+        <p style="font-size:12px;color:#8B8F87;margin:8px 0 0;">Az árak tartalmazzák az ÁFÁ-t.</p>
         ${infoBlock([
           ["Szállítás", data.shipping_method],
           ["Átvételi pont", data.pickup_point],
@@ -215,13 +243,13 @@ function renderBody(template: string, data: Record<string, any>): string {
           ["Fizetés", data.payment_method],
         ])}
         ${button(`${STORE_URL}/hu/account`, "Rendeléseim megtekintése")}
-        <p style="color:#666;font-size:13px;margin-top:12px;">Kérdésed van? Írj nekünk: <a href="mailto:${CONTACT}" style="color:${MATCHA};">${CONTACT}</a></p>`
+        <p style="color:${MUTED};font-size:13px;margin-top:16px;">Kérdésed van? Írj nekünk: <a href="mailto:${CONTACT}" style="color:${DARK};font-weight:700;">${CONTACT}</a></p>`
     }
 
     case "shipping-confirmation":
       return `
         ${h1("Csomagod úton van! 📦")}
-        <p style="color:#666;">A <strong>#${esc(
+        <p style="color:${MUTED};">A <strong style="color:${DARK};">#${esc(
           data.order_number
         )}</strong> számú rendelésedet feladtuk, és már úton van hozzád. Jellemzően <strong>1–3 munkanapon</strong> belül megérkezik.</p>
         ${
@@ -229,20 +257,20 @@ function renderBody(template: string, data: Record<string, any>): string {
             ? button(data.tracking_url, "Csomag követése", true)
             : ""
         }
-        <p style="color:#666;font-size:13px;margin-top:14px;">Bármi kérdés a szállítással kapcsolatban? Keress minket: <a href="mailto:${CONTACT}" style="color:${MATCHA};">${CONTACT}</a></p>`
+        <p style="color:${MUTED};font-size:13px;margin-top:16px;">Bármi kérdés a szállítással kapcsolatban? Keress minket: <a href="mailto:${CONTACT}" style="color:${DARK};font-weight:700;">${CONTACT}</a></p>`
 
     case "password-reset":
       return `
         ${h1("Jelszó visszaállítása")}
-        <p style="color:#666;">Kérted a jelszavad visszaállítását. Kattints az alábbi gombra egy új jelszó beállításához. A link biztonsági okokból hamarosan lejár.</p>
+        <p style="color:${MUTED};">Kérted a jelszavad visszaállítását. Kattints az alábbi gombra egy új jelszó beállításához. A link biztonsági okokból hamarosan lejár.</p>
         ${button(data.reset_url ?? "#", "Új jelszó beállítása", true)}
-        <p style="color:#aaa;font-size:13px;margin-top:12px;">Ha nem te kérted, nyugodtan hagyd figyelmen kívül ezt az e-mailt — a jelszavad változatlan marad.</p>`
+        <p style="color:#8B8F87;font-size:13px;margin-top:16px;">Ha nem te kérted, nyugodtan hagyd figyelmen kívül ezt az e-mailt — a jelszavad változatlan marad.</p>`
 
     case "admin-order-notification": {
       const items = Array.isArray(data.items) ? data.items : []
       return `
         ${h1(`Új rendelés érkezett! 🎉 #${esc(data.order_number)}`)}
-        <p style="color:#666;margin:0 0 16px;">
+        <p style="color:${MUTED};margin:0 0 16px;">
           <strong>Vásárló:</strong> ${esc(data.customer_name)} (${esc(
             data.customer_email
           )})<br/>
@@ -287,11 +315,11 @@ function renderBody(template: string, data: Record<string, any>): string {
         .join("")
       return `
         ${h1("Hogy ízlett? 🍵")}
-        <p style="color:#666;">Pár napja megérkezett a <strong>#${esc(
+        <p style="color:${MUTED};">Pár napja megérkezett a <strong style="color:${DARK};">#${esc(
           data.order_number
         )}</strong> számú rendelésed — reméljük, már meg is találtad benne a saját rituálédat. Sokat segítenél nekünk (és a többi matcharajongónak), ha megosztanád pár szóban, hogy ízlett!</p>
-        <ul style="color:#666;padding-left:18px;margin:14px 0;">${links}</ul>
-        <p style="color:#666;font-size:13px;">A linkre kattintva a termékoldalon tudod leadni az értékelésed — 2 perc az egész.</p>
+        <ul style="color:${MUTED};padding-left:18px;margin:14px 0;">${links}</ul>
+        <p style="color:${MUTED};font-size:13px;">A linkre kattintva a termékoldalon tudod leadni az értékelésed — 2 perc az egész.</p>
         ${products[0]?.url ? button(products[0].url, "Vélemény írása") : ""}`
     }
 
@@ -299,25 +327,25 @@ function renderBody(template: string, data: Record<string, any>): string {
       const items = Array.isArray(data.items) ? data.items : []
       return `
         ${h1("A kosarad még vár rád 🍵")}
-        <p style="color:#666;">Úgy láttuk, félbehagytad a rendelésed — a matchád még a kosaradban pihen. Ha kérdésed van a termékekről vagy a szállításról, írj bátran, szívesen segítünk!</p>
+        <p style="color:${MUTED};">Úgy láttuk, félbehagytad a rendelésed — a matchád még a kosaradban pihen. Ha kérdésed van a termékekről vagy a szállításról, írj bátran, szívesen segítünk.</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${itemRows(
           items,
           cur,
           false
         )}</table>
         ${button(data.cart_url ?? STORE_URL, "Rendelés befejezése")}
-        <p style="color:#aaa;font-size:12px;margin-top:12px;">Tipp: 15 000 Ft feletti rendelésnél a szállítás ingyenes.</p>`
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;background:#FCE9ED;border-radius:14px;"><tr><td style="padding:13px 16px;color:${DARK};font-size:12px;font-weight:700;">Ingyenes szállítás 15 000 Ft feletti rendelésnél.</td></tr></table>`
     }
 
     case "welcome":
       return `
-        <img src="${HERO_URL}" alt="" width="100%" style="display:block;width:100%;border-radius:12px;margin:-10px 0 20px;" />
+        <img src="${HERO_URL}" alt="Original Momo Matcha fémdoboz" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:18px;margin:0 0 28px;" />
         ${h1(`Üdvözlünk${data.first_name ? `, ${esc(data.first_name)}` : ""}! 🌿`)}
-        <p style="color:#666;">Örülünk, hogy csatlakoztál a Momo Matcha közösséghez. Fedezd fel prémium, bio matcháinkat Uji dombjairól — a klasszikus szertartásostól a gyümölcsös ízesítettekig —, és találd meg a saját reggeli rituáléd.</p>
+        <p style="color:${MUTED};">Örülünk, hogy csatlakoztál a Momo Matcha közösséghez. Fedezd fel prémium matcháinkat Japánból — a klasszikus szertartásostól a gyümölcsös ízesítettekig —, és találd meg a saját reggeli rituáléd.</p>
         ${button(STORE_URL, "Irány a bolt")}`
 
     default:
-      return `${h1(esc(data.subject ?? "Momo Matcha"))}<p style="color:#666;">${esc(
+      return `${h1(esc(data.subject ?? "Momo Matcha"))}<p style="color:${MUTED};">${esc(
         data.message ?? ""
       )}</p>`
   }
