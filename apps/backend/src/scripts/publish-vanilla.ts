@@ -3,7 +3,10 @@ import {
   ContainerRegistrationKeys,
   ProductStatus,
 } from "@medusajs/framework/utils";
-import { createProductsWorkflow } from "@medusajs/medusa/core-flows";
+import {
+  createProductsWorkflow,
+  updateProductsWorkflow,
+} from "@medusajs/medusa/core-flows";
 
 const HANDLE = "vanilias-premium-momo-matcha";
 const IMAGE_ROOT = "https://momomatcha.hu/images/products";
@@ -16,12 +19,14 @@ export default async function publishVanilla({
 }) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
   const query = container.resolve(ContainerRegistrationKeys.QUERY);
-  const productModuleService = container.resolve("product");
-
   const { data: products } = await query.graph({
     entity: "product",
     fields: ["id", "handle"],
     filters: { handle: HANDLE },
+  });
+  const { data: salesChannels } = await query.graph({
+    entity: "sales_channel",
+    fields: ["id"],
   });
 
   const productData = {
@@ -38,7 +43,19 @@ export default async function publishVanilla({
   };
 
   if (products[0]) {
-    await productModuleService.updateProducts(products[0].id, productData);
+    await updateProductsWorkflow(container).run({
+      input: {
+        products: [
+          {
+            id: products[0].id,
+            ...productData,
+            sales_channels: salesChannels[0]
+              ? [{ id: salesChannels[0].id }]
+              : [],
+          },
+        ],
+      },
+    });
     logger.info(
       `${SHOULD_PUBLISH ? "Published" : "Prepared"} existing vanilla product (${products[0].id}).`,
     );
@@ -52,10 +69,6 @@ export default async function publishVanilla({
   const { data: collections } = await query.graph({
     entity: "product_collection",
     fields: ["id", "handle"],
-  });
-  const { data: salesChannels } = await query.graph({
-    entity: "sales_channel",
-    fields: ["id"],
   });
   const { data: shippingProfiles } = await query.graph({
     entity: "shipping_profile",
