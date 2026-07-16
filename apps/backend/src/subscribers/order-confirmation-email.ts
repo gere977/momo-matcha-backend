@@ -59,6 +59,7 @@ export default async function orderConfirmationHandler({
     template: "order-confirmation",
     data: {
       subject: `Rendelésed visszaigazolása - #${publicOrderNumber(order.display_id)}`,
+      idempotency_key: `order-confirmation:${order.id}`,
       order_number: publicOrderNumber(order.display_id),
       currency_code: order.currency_code,
       // Gross (VAT included) - matches the storefront's tax-inclusive display.

@@ -1,7 +1,8 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { CRM_LITE_MODULE } from "../../../../modules/crm-lite"
 
-const GRAPH = "https://graph.facebook.com/v21.0"
+const GRAPH_VERSION = process.env.META_GRAPH_API_VERSION || "v25.0"
+const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`
 
 type Body = {
   caption?: string

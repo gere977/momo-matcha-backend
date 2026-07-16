@@ -75,6 +75,7 @@ export default async function adminOrderNotificationHandler({
       template: "admin-order-notification",
       data: {
         subject: `Új rendelés: #${publicOrderNumber(order.display_id)} (${order.email})`,
+        idempotency_key: `admin-order:${order.id}:${to}`,
         order_id: order.id,
         order_number: publicOrderNumber(order.display_id),
         internal_order_number: order.display_id,

@@ -15,14 +15,14 @@ export default async function welcomeEmailHandler({
   })
   const customer = customers[0]
   if (!customer?.has_account || !customer.email) return
-
   await notificationModuleService.createNotifications({
     to: customer.email,
     channel: "email",
-    template: "welcome",
+    template: "account-welcome",
     data: {
-      subject: "Üdvözlünk a Momo Matcha közösségben!",
+      subject: "Elkészült a Momo-fiókod",
       first_name: customer.first_name,
+      idempotency_key: `account-welcome:${customer.id}`,
     },
   })
 }

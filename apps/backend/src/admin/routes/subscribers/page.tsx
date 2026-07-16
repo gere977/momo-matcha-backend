@@ -34,6 +34,8 @@ type Signup = {
   id: string
   email: string
   source: string | null
+  confirmed_at: string | null
+  marketing_suppressed: boolean
   created_at: string
 }
 
@@ -82,7 +84,15 @@ const SubscribersPage = () => {
     queryFn: fetchSignups,
   })
 
-  const newsletter = signups.filter((s) => s.source === "newsletter")
+  const newsletter = signups.filter(
+    (s) =>
+      s.source === "newsletter" &&
+      s.confirmed_at &&
+      !s.marketing_suppressed
+  )
+  const newsletterPending = signups.filter(
+    (s) => s.source === "newsletter" && !s.confirmed_at
+  )
   const waitlist = signups.filter((s) => s.source !== "newsletter")
 
   return (
@@ -94,10 +104,10 @@ const SubscribersPage = () => {
           <Button
             size="small"
             variant="secondary"
-            disabled={!signups.length}
-            onClick={() => downloadCsv(signups)}
+            disabled={!newsletter.length}
+            onClick={() => downloadCsv(newsletter)}
           >
-            CSV letöltése ({signups.length})
+            Megerősített hírlevél CSV ({newsletter.length})
           </Button>
         }
       />
@@ -110,14 +120,18 @@ const SubscribersPage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-4">
         <Kpi
-          label="Összes feliratkozó"
+          label="Összes rögzített cím"
           value={isLoading ? "…" : String(signups.length)}
         />
         <Kpi
-          label="Hírlevél"
+          label="Megerősített hírlevél"
           value={isLoading ? "…" : String(newsletter.length)}
+        />
+        <Kpi
+          label="Megerősítésre vár"
+          value={isLoading ? "…" : String(newsletterPending.length)}
         />
         <Kpi
           label="Új-íz várólista"
@@ -133,18 +147,19 @@ const SubscribersPage = () => {
               <Table.Row>
                 <Table.HeaderCell>E-mail</Table.HeaderCell>
                 <Table.HeaderCell>Forrás</Table.HeaderCell>
+                <Table.HeaderCell>Státusz</Table.HeaderCell>
                 <Table.HeaderCell className="text-right">Dátum</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
               {isLoading && (
                 <Table.Row>
-                  <Table.Cell colSpan={3}>Betöltés…</Table.Cell>
+                  <Table.Cell colSpan={4}>Betöltés…</Table.Cell>
                 </Table.Row>
               )}
               {!isLoading && signups.length === 0 && (
                 <Table.Row>
-                  <Table.Cell colSpan={3}>
+                  <Table.Cell colSpan={4}>
                     Még nincs feliratkozó. A lábléces hírlevél-mező és a
                     „Hamarosan" szekció gyűjti őket.
                   </Table.Cell>
@@ -160,6 +175,30 @@ const SubscribersPage = () => {
                     >
                       {SOURCE_HU[s.source ?? ""] ?? s.source ?? "-"}
                     </Badge>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {s.source === "newsletter" ? (
+                      <Badge
+                        size="2xsmall"
+                        color={
+                          s.marketing_suppressed
+                            ? "red"
+                            : s.confirmed_at
+                            ? "green"
+                            : "orange"
+                        }
+                      >
+                        {s.marketing_suppressed
+                          ? "Leiratkozott"
+                          : s.confirmed_at
+                          ? "Megerősítve"
+                          : "Megerősítésre vár"}
+                      </Badge>
+                    ) : (
+                      <Text size="xsmall" className="text-ui-fg-muted">
+                        Várólista
+                      </Text>
+                    )}
                   </Table.Cell>
                   <Table.Cell className="text-right">
                     {new Date(s.created_at).toLocaleDateString("hu-HU")}

@@ -1,6 +1,8 @@
 import type { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { publicOrderNumber } from "../utils/order-number"
+import { isMarketingEmailSuppressed } from "../utils/email-preferences"
+import { lifecycleEmailJobsEnabled } from "../utils/lifecycle-email-jobs"
 
 const STORE_URL = "https://momomatcha.hu"
 const WAIT_DAYS = 5 // days after the order was shipped
@@ -10,10 +12,11 @@ const MAX_AGE_DAYS = 30
 // Runs daily; each order is asked exactly once (metadata.review_request_sent).
 // This is how the storefront's review section fills up with REAL reviews.
 export default async function reviewRequestJob(container: MedusaContainer) {
+  if (!lifecycleEmailJobsEnabled()) return
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
   const notificationModuleService = container.resolve(Modules.NOTIFICATION)
-  const orderModuleService = container.resolve("order") as any
+  const orderModuleService = container.resolve(Modules.ORDER) as any
 
   const windowStart = new Date()
   windowStart.setDate(windowStart.getDate() - MAX_AGE_DAYS)
@@ -41,32 +44,47 @@ export default async function reviewRequestJob(container: MedusaContainer) {
   const due = (orders as any[]).filter((o) => {
     if (o.status === "canceled" || !o.email) return false
     if (o.metadata?.review_request_sent) return false
-    const shippedAt = (o.fulfillments ?? [])
-      .map((f: any) => (f?.shipped_at ? new Date(f.shipped_at).getTime() : null))
-      .filter(Boolean)
-      .sort()[0]
+    if (o.metadata?.review_request_suppressed_at) return false
+    const fulfillments = o.fulfillments ?? []
+    if (!fulfillments.length || fulfillments.some((f: any) => !f?.shipped_at)) {
+      return false
+    }
+    const shippedAt = Math.max(
+      ...fulfillments.map((f: any) => new Date(f.shipped_at).getTime())
+    )
     return shippedAt != null && now - shippedAt >= cutoff
   })
 
   for (const order of due) {
-    const products = (order.items ?? [])
-      .filter((i: any) => i.product_id)
-      .map((i: any) => ({
-        title: i.product_title ?? i.title,
-        url: i.product_handle
-          ? `${STORE_URL}/hu/products/${i.product_handle}#velemenyek`
-          : `${STORE_URL}/hu/store`,
-      }))
-
-    if (!products.length) continue
-
     try {
+      if (await isMarketingEmailSuppressed(container, order.email)) {
+        await orderModuleService.updateOrders(order.id, {
+          metadata: {
+            ...(order.metadata ?? {}),
+            review_request_suppressed_at: new Date().toISOString(),
+          },
+        })
+        continue
+      }
+
+      const products = (order.items ?? [])
+        .filter((i: any) => i.product_id)
+        .map((i: any) => ({
+          title: i.product_title ?? i.title,
+          url: i.product_handle
+            ? `${STORE_URL}/hu/products/${i.product_handle}?utm_source=email&utm_medium=email&utm_campaign=review_request#velemenyek`
+            : `${STORE_URL}/hu/store?utm_source=email&utm_medium=email&utm_campaign=review_request`,
+        }))
+
+      if (!products.length) continue
+
       await notificationModuleService.createNotifications({
         to: order.email,
         channel: "email",
         template: "review-request",
         data: {
           subject: "Hogy ízlett a matchád? 🍵 Mondd el pár szóban!",
+          idempotency_key: `review-request:${order.id}`,
           order_number: publicOrderNumber(order.display_id),
           products,
         },

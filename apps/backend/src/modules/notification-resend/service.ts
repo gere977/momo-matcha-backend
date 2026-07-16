@@ -4,6 +4,7 @@ import type {
   ProviderSendNotificationDTO,
   ProviderSendNotificationResultsDTO,
 } from "@medusajs/framework/types"
+import { createUnsubscribeUrl } from "../../utils/email-preferences"
 
 type ResendOptions = {
   apiKey?: string
@@ -21,13 +22,13 @@ const ACCENT = "#F4748B"
 const CREAM = "#F7F2E8"
 const PAPER = "#FFFDF7"
 const KRAFT = "#DED2BF"
-const MUTED = "#697066"
+const MUTED = "#535C52"
 const VANILLA = "#F3DFC0"
 const STORE_URL = "https://momomatcha.hu"
-const LOGO_URL = `${STORE_URL}/images/logo-transparent.png`
+const LOGO_URL = `${STORE_URL}/images/logo-email.png`
 // The welcome email is the only image-led template. It uses the same tin-can
 // splash artwork as the new storefront instead of the old generic tea field.
-const HERO_URL = `${STORE_URL}/images/products/momo-original-splash-card.png`
+const HERO_URL = `${STORE_URL}/images/products/momo-original-splash-card.jpg`
 const CONTACT = "info@momomatcha.hu"
 
 // Brand-adjacent, email-client-safe font stacks. Webfonts (Nunito/Quicksand)
@@ -39,10 +40,75 @@ const EDITORIAL = "Georgia,'Times New Roman',serif"
 // Marketing-type templates get an opt-out footer + List-Unsubscribe header;
 // transactional ones (receipts, resets) must not.
 const MARKETING_TEMPLATES = new Set([
-  "welcome",
   "review-request",
   "abandoned-cart",
+  "post-purchase-prep",
+  "refill-reminder",
+  "newsletter-welcome-1",
+  "newsletter-welcome-2",
+  "newsletter-welcome-3",
+  "winback-60",
+  "winback-90",
 ])
+
+const PROMO_STRIP_TEMPLATES = new Set([
+  "review-request",
+  "abandoned-cart",
+  "post-purchase-prep",
+  "refill-reminder",
+  "newsletter-welcome-1",
+  "newsletter-welcome-2",
+  "newsletter-welcome-3",
+  "winback-60",
+  "winback-90",
+])
+
+function emailUrl(path: string, campaign: string): string {
+  const url = new URL(path, STORE_URL)
+  url.searchParams.set("utm_source", "email")
+  url.searchParams.set("utm_medium", "email")
+  url.searchParams.set("utm_campaign", campaign)
+  return url.toString()
+}
+
+function preheaderFor(template: string, data: Record<string, any>): string {
+  switch (template) {
+    case "order-confirmation":
+      return `A #${data.order_number ?? ""} rendelésed részletei és a következő lépések.`
+    case "shipping-confirmation":
+      return data.tracking_number
+        ? `A csomagod feladásra került. Követési szám: ${data.tracking_number}.`
+        : `A #${data.order_number ?? ""} rendelésed feladásra került.`
+    case "password-reset":
+      return "A biztonságos jelszócsere linkjét ebben a levélben találod."
+    case "admin-order-notification":
+      return `Új rendelés érkezett: #${data.order_number ?? ""}.`
+    case "review-request":
+      return "Két perc alatt segíthetsz a következő matcharajongónak választani."
+    case "abandoned-cart":
+      return "Egy kattintással ott folytathatod, ahol abbahagytad."
+    case "account-welcome":
+      return "A fiókod elkészült; itt éred el a rendeléseidet és az adataidat."
+    case "post-purchase-prep":
+      return "Három apró lépés a csomómentes, habos első matchádhoz."
+    case "refill-reminder":
+      return "Ha fogyóban a matchád, most könnyen feltöltheted a polcot."
+    case "newsletter-welcome-1":
+      return "Négy Momo, négy hangulat — segítünk megtalálni a tiedet."
+    case "newsletter-confirm":
+      return "Erősítsd meg egy kattintással, hogy valóban te kérted a Momo leveleket."
+    case "newsletter-welcome-2":
+      return "Hőfok, szitálás, habosítás: ennyi választ el a selymes matchától."
+    case "newsletter-welcome-3":
+      return "Három gyors kérdés, és mutatjuk, melyik ízzel érdemes kezdened."
+    case "winback-60":
+      return "Ha hiányzik a reggeli hab, mutatunk egy könnyű visszatérést."
+    case "winback-90":
+      return "Nincs bűntudatkeltés — csak egy neked való következő íz."
+    default:
+      return String(data.subject ?? "Momo Matcha")
+  }
+}
 
 // All customer-sourced values (names, product titles, pickup points) are
 // interpolated into HTML — escape them so a title like `Matcha <3` can't
@@ -87,9 +153,20 @@ function button(url: string, label: string, withFallback = false) {
 
 // Branded, email-client-safe wrapper (tables + inline styles) with a hidden
 // preheader for the inbox preview line.
-function layout(bodyHtml: string, preheader = "", marketing = false) {
-  const optOut = marketing
-    ? `<br><span style="display:inline-block;margin-top:8px;">Nem szeretnél több ilyen levelet? <a href="mailto:${CONTACT}?subject=Leiratkozas" style="color:${VANILLA};text-decoration:underline;text-underline-offset:3px;">Itt jelezheted.</a></span>`
+function layout(
+  bodyHtml: string,
+  preheader = "",
+  marketing = false,
+  template = "",
+  unsubscribeUrl?: string
+) {
+  const optOut = marketing && unsubscribeUrl
+    ? `<br><span style="display:inline-block;margin-top:8px;">Nem szeretnél több ilyen levelet? <a href="${esc(
+        unsubscribeUrl
+      )}" style="color:${VANILLA};text-decoration:underline;text-underline-offset:3px;">Leiratkozom.</a></span>`
+    : ""
+  const promoStrip = PROMO_STRIP_TEMPLATES.has(template)
+    ? `<tr><td align="center" style="background:${MATCHA};padding:9px 18px;font-family:${FONT};font-size:12px;font-weight:700;color:#ffffff;letter-spacing:.15px;">🍵 &nbsp;Ingyenes szállítás 15 000 Ft feletti rendelésre</td></tr>`
     : ""
   return `<!DOCTYPE html>
 <html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
@@ -105,19 +182,13 @@ function layout(bodyHtml: string, preheader = "", marketing = false) {
     preheader
   )}</span>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:${CREAM};">
-    <tr><td align="center" style="background:${MATCHA};padding:9px 18px;font-family:${FONT};font-size:12px;font-weight:700;color:#ffffff;letter-spacing:.15px;">🍵 &nbsp;Ingyenes szállítás 15 000 Ft feletti rendelésre</td></tr>
+    ${promoStrip}
     <tr><td align="center" style="padding:30px 14px 34px;">
       <table role="presentation" width="620" cellpadding="0" cellspacing="0" class="email-shell" style="width:620px;max-width:100%;">
         <tr><td align="center" style="padding:4px 0 22px;">
-          <a href="${STORE_URL}" style="text-decoration:none;">
-            <img src="${LOGO_URL}" width="116" height="80" alt="Momo Matcha" style="display:block;width:116px;height:80px;object-fit:contain;margin:0 auto;border:0;" />
+          <a href="${STORE_URL}" style="display:inline-block;text-decoration:none;">
+            <img src="${LOGO_URL}" width="120" alt="Momo Matcha" style="display:block;width:120px;max-width:120px;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;" />
           </a>
-          <table role="presentation" width="210" cellpadding="0" cellspacing="0" style="width:210px;margin:8px auto 0;"><tr>
-            <td style="height:1px;background:${KRAFT};font-size:0;line-height:0;">&nbsp;</td>
-            <td width="34" align="center"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#E84B3C;font-size:0;line-height:0;">&nbsp;</span></td>
-            <td style="height:1px;background:${KRAFT};font-size:0;line-height:0;">&nbsp;</td>
-          </tr></table>
-          <div style="font-family:${FONT};font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${DARK};margin-top:9px;">Japánból, gonddal</div>
         </td></tr>
         <tr><td style="background:${PAPER};border-radius:28px 28px 0 0;padding:12px 42px 0;" class="email-pad">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="height:7px;background:${ACCENT};border-radius:999px;font-size:0;line-height:0;">&nbsp;</td></tr></table>
@@ -125,14 +196,14 @@ function layout(bodyHtml: string, preheader = "", marketing = false) {
         <tr><td class="email-pad" style="background:${PAPER};padding:38px 42px 44px;font-family:${FONT};font-size:15px;color:${MUTED};line-height:1.7;">
           ${bodyHtml}
         </td></tr>
-        <tr><td align="center" style="background:${DARK};border-radius:0 0 28px 28px;padding:28px 24px 30px;font-family:${FONT};font-size:12px;color:#D8E0D4;line-height:1.75;">
+        <tr><td align="center" style="background:${DARK};border-radius:0 0 28px 28px;padding:28px 24px 30px;font-family:${FONT};font-size:12px;color:#E2E9DF;line-height:1.75;">
           <div style="font-family:${EDITORIAL};font-size:19px;font-weight:700;color:#ffffff;margin-bottom:5px;">Egy nyugodt pillanat.</div>
-          <div style="color:#BFCBB9;margin-bottom:14px;">A mindennapi matcha-rituáléd.</div>
+          <div style="color:#D0DBCC;margin-bottom:14px;">A mindennapi matcha-rituáléd.</div>
           <a href="${STORE_URL}" style="color:${VANILLA};font-weight:700;text-decoration:none;">momomatcha.hu</a>
           &nbsp;&nbsp;·&nbsp;&nbsp;
           <a href="mailto:${CONTACT}" style="color:${VANILLA};font-weight:700;text-decoration:none;">${CONTACT}</a>
           ${optOut}<br>
-          <span style="display:inline-block;margin-top:12px;color:#91A08B;">© ${new Date().getFullYear()} Momo Matcha</span>
+          <span style="display:inline-block;margin-top:12px;color:#B8C6B3;">© ${new Date().getFullYear()} Momo Matcha</span>
         </td></tr>
       </table>
     </td></tr>
@@ -252,6 +323,11 @@ function renderBody(template: string, data: Record<string, any>): string {
         <p style="color:${MUTED};">A <strong style="color:${DARK};">#${esc(
           data.order_number
         )}</strong> számú rendelésedet feladtuk, és már úton van hozzád. Jellemzően <strong>1–3 munkanapon</strong> belül megérkezik.</p>
+        ${infoBlock([
+          ["Szállítás", data.carrier],
+          ["Követési szám", data.tracking_number],
+          ["Átvételi pont", data.pickup_point],
+        ])}
         ${
           data.tracking_url
             ? button(data.tracking_url, "Csomag követése", true)
@@ -337,12 +413,101 @@ function renderBody(template: string, data: Record<string, any>): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;background:#FCE9ED;border-radius:14px;"><tr><td style="padding:13px 16px;color:${DARK};font-size:12px;font-weight:700;">Ingyenes szállítás 15 000 Ft feletti rendelésnél.</td></tr></table>`
     }
 
-    case "welcome":
+    case "account-welcome":
+      return `
+        ${h1(`Elkészült a Momo-fiókod${data.first_name ? `, ${esc(data.first_name)}` : ""}`)}
+        <p style="color:${MUTED};">Mostantól egy helyen követheted a rendeléseidet, ellenőrizheted a szállítási adataidat, és a korábbi rendeléseidet is újra kosárba teheted.</p>
+        ${button(`${STORE_URL}/hu/account`, "Fiókom megnyitása")}`
+
+    case "newsletter-welcome-1":
       return `
         <img src="${HERO_URL}" alt="Original Momo Matcha fémdoboz" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:18px;margin:0 0 28px;" />
-        ${h1(`Üdvözlünk${data.first_name ? `, ${esc(data.first_name)}` : ""}! 🌿`)}
-        <p style="color:${MUTED};">Örülünk, hogy csatlakoztál a Momo Matcha közösséghez. Fedezd fel prémium matcháinkat Japánból — a klasszikus szertartásostól a gyümölcsös ízesítettekig —, és találd meg a saját reggeli rituáléd.</p>
-        ${button(STORE_URL, "Irány a bolt")}`
+        ${h1("Na, melyik Momo leszel? 🍵")}
+        <p style="color:${MUTED};">Jó helyen jársz, ha finom matchát szeretnél inni anélkül, hogy vizsgát tennél teaszertartásból. Négy ízzel indulunk: Original, Epres, Vaníliás és Csokoládés — mindegyik más hangulathoz.</p>
+        <p style="color:${MUTED};">A következő napokban küldünk egy rövid elkészítési cheat sheetet és egy háromkérdéses ízválasztót. Ennyi. Napi spam helyett használható segítség.</p>
+        ${button(emailUrl("/hu#matcha-csalad", "newsletter_welcome_1"), "Ismerd meg a Momo családot")}`
+
+    case "newsletter-confirm":
+      return `
+        ${h1("Egy kattintás, és jöhetnek a Momo levelek")}
+        <p style="color:${MUTED};">Valaki — reméljük, te — ezzel a címmel feliratkozott a Momo receptjeire, elkészítési tippjeire és újdonságaira.</p>
+        <p style="color:${MUTED};">A gomb még nem irat fel automatikusan: a megnyíló oldalon külön meg kell erősítened. Ha nem te kérted, egyszerűen hagyd figyelmen kívül ezt a levelet.</p>
+        ${button(data.confirm_url ?? STORE_URL, "Feliratkozás megerősítése")}`
+
+    case "newsletter-welcome-2":
+      return `
+        ${h1("A habos matcha cheat code-ja")}
+        <p style="color:${MUTED};margin:0 0 20px;">Nem kell tökéletesnek lennie. Ezt a három dolgot tartsd fejben, és már az első csésze is sokkal selymesebb lesz:</p>
+        ${infoBlock([
+          ["1. Szitáld", "1–2 g matcha — így nem marad csomós."],
+          ["2. Ne forrázd", "75–80 °C-os víz bőven elég."],
+          ["3. Habosítsd", "Gyors M vagy W mozdulat, 20–30 másodperc."],
+        ])}
+        <p style="color:${MUTED};font-size:13px;margin:20px 0 0;">Latte? A végén öntsd fel 150–200 ml kedvenc tejeddel. Hidegen is működik.</p>
+        ${button(emailUrl("/hu/tudastar/matcha-keszites", "newsletter_welcome_2"), "Mutasd a teljes útmutatót")}`
+
+    case "newsletter-welcome-3":
+      return `
+        ${h1("3 kérdés. 1 neked való Momo.")}
+        <p style="color:${MUTED};">Letisztult és klasszikus? Original. Gyümölcsös és játékos? Epres. Lágy, desszertes hangulat? Vaníliás. Mélyebb, kakaós latte? Csokoládés.</p>
+        <p style="color:${MUTED};">Ha még mindig két doboz között vacillálsz, a mini ízválasztó helyetted pontozza a válaszokat — nincs e-mail-kapu, rögtön mutatja az eredményt.</p>
+        ${button(emailUrl("/hu#melyik-momo", "newsletter_welcome_3"), "Kitöltöm a 3 kérdést")}`
+
+    case "winback-60":
+      return `
+        ${h1("Régen habosítottunk együtt 🍵")}
+        <p style="color:${MUTED};">Ha elfogyott a matchád, vagy egyszerűen kiestél a rutinból: teljesen normális. A rituálé ott folytatódik, ahol neked kényelmes.</p>
+        <p style="color:${MUTED};">${
+          data.recommended_name
+            ? `A legutóbbi választásod alapján most a <strong style="color:${DARK};">${esc(data.recommended_name)}</strong> lehet egy jó következő kóstoló.`
+            : "A háromkérdéses ízválasztó segít újra megtalálni, melyik Momo passzol most hozzád."
+        }</p>
+        ${button(data.shop_url ?? emailUrl("/hu#melyik-momo", "winback_60"), "Megnézem, mi passzol most")}`
+
+    case "winback-90":
+      return `
+        ${h1("Újrakezdjük egy hozzád illő Momóval?")}
+        <p style="color:${MUTED};">Nincs „hol voltál?” és nincs sürgetés. Csak gondoltuk, szólunk: a Momo család itt van, ha megint jól esne egy nyugodtabb reggel vagy egy jeges délutáni latte.</p>
+        <p style="color:${MUTED};">${
+          data.recommended_name
+            ? `Kóstolási tippünk neked: <strong style="color:${DARK};">${esc(data.recommended_name)}</strong>.`
+            : "Három gyors kérdésből ajánlunk egy ízt, kedvezményvadászat és e-mail-kapu nélkül."
+        }</p>
+        ${button(data.shop_url ?? emailUrl("/hu#melyik-momo", "winback_90"), "Visszanézek a Momókhoz")}`
+
+    case "post-purchase-prep":
+      return `
+        ${h1("Készülj az első habos Momódra 🍵")}
+        <p style="color:${MUTED};margin:0 0 20px;">Miközben gondosan összekészítjük a <strong style="color:${DARK};">#${esc(
+          data.order_number
+        )}</strong> rendelésed, mutatjuk a három apróságot, amitől a matchád csomómentes és selymes lesz.</p>
+        ${infoBlock([
+          ["1. Szitálás", "Szitálj 1–2 g matchát a tálba."],
+          ["2. Víz", "Adj hozzá kb. 50–80 ml, 75–80 °C-os vizet."],
+          ["3. Habosítás", "Gyors M vagy W mozdulatokkal habosíts 20–30 másodpercig."],
+        ])}
+        <p style="color:${MUTED};font-size:13px;margin:20px 0 0;">Latte lesz belőle? Öntsd fel 150–200 ml meleg vagy hideg tejjel, és kész is.</p>
+        ${button(
+          data.guide_url ?? emailUrl("/hu/tudastar/matcha-keszites", "post_purchase_prep"),
+          "Mutasd a teljes útmutatót"
+        )}`
+
+    case "refill-reminder": {
+      const items = Array.isArray(data.items) ? data.items : []
+      return `
+        ${h1("Fogyóban a matchád? 🌿")}
+        <p style="color:${MUTED};margin:0 0 18px;">Nagyjából négy hete érkezett meg hozzád az alábbi Momo rendelés. Ha a doboz alja már kezd előbukkanni, egy kattintással feltöltheted a matcha-polcot.</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${itemRows(
+          items,
+          undefined,
+          false
+        )}</table>
+        ${button(
+          data.shop_url ?? emailUrl("/hu/store", "refill_reminder"),
+          "Matcha-polc feltöltése"
+        )}
+        <p style="color:${MUTED};font-size:13px;margin-top:16px;">Még van otthon bőven? Semmi teendőd — ez csak egy barátságos emlékeztető.</p>`
+    }
 
     default:
       return `${h1(esc(data.subject ?? "Momo Matcha"))}<p style="color:${MUTED};">${esc(
@@ -353,9 +518,16 @@ function renderBody(template: string, data: Record<string, any>): string {
 
 // Plain-text alternative — improves spam scoring and serves text-only
 // clients. Short: the key facts + the primary link.
-function renderText(template: string, data: Record<string, any>): string {
+function renderText(
+  template: string,
+  data: Record<string, any>,
+  unsubscribeUrl?: string
+): string {
   const cur = data.currency_code
-  const foot = `\n\nmomomatcha.hu · ${CONTACT}`
+  const marketingFoot = unsubscribeUrl
+    ? `\nLeiratkozás: ${unsubscribeUrl}`
+    : ""
+  const foot = `\n\nmomomatcha.hu · ${CONTACT}${marketingFoot}`
 
   switch (template) {
     case "order-confirmation": {
@@ -374,6 +546,11 @@ function renderText(template: string, data: Record<string, any>): string {
     case "shipping-confirmation":
       return (
         `Csomagod úton van!\n\nA #${data.order_number} számú rendelésedet feladtuk — jellemzően 1–3 munkanapon belül megérkezik.` +
+        (data.carrier ? `\nSzállítás: ${data.carrier}` : "") +
+        (data.tracking_number
+          ? `\nKövetési szám: ${data.tracking_number}`
+          : "") +
+        (data.pickup_point ? `\nÁtvételi pont: ${data.pickup_point}` : "") +
         (data.tracking_url ? `\n\nCsomag követése: ${data.tracking_url}` : "") +
         foot
       )
@@ -398,10 +575,62 @@ function renderText(template: string, data: Record<string, any>): string {
           data.cart_url ?? STORE_URL
         }\n\nTipp: 15 000 Ft felett ingyenes a szállítás.` + foot
       )
-    case "welcome":
+    case "account-welcome":
       return (
-        `Üdvözlünk a Momo Matcha közösségben!\n\nFedezd fel a matcháinkat: ${STORE_URL}` +
+        `Elkészült a Momo-fiókod.\n\nRendeléseid és adataid: ${STORE_URL}/hu/account` +
         foot
+      )
+    case "newsletter-welcome-1":
+      return (
+        `Na, melyik Momo leszel?\n\nNégy ízzel indulunk: Original, Epres, Vaníliás és Csokoládés. Ismerd meg a családot: ${emailUrl(
+          "/hu#matcha-csalad",
+          "newsletter_welcome_1"
+        )}` + foot
+      )
+    case "newsletter-confirm":
+      return (
+        `Momo hírlevél megerősítése\n\nHa te kérted a Momo leveleket, erősítsd meg itt: ${
+          data.confirm_url ?? STORE_URL
+        }\n\nHa nem te voltál, nincs semmi teendőd.` + foot
+      )
+    case "newsletter-welcome-2":
+      return (
+        `A habos matcha cheat code-ja\n\n1. Szitálj 1–2 g matchát.\n2. Használj 75–80 °C-os vizet.\n3. Habosíts gyors M vagy W mozdulatokkal 20–30 másodpercig.\n\nTeljes útmutató: ${emailUrl(
+          "/hu/tudastar/matcha-keszites",
+          "newsletter_welcome_2"
+        )}` + foot
+      )
+    case "newsletter-welcome-3":
+      return (
+        `3 kérdés. 1 neked való Momo.\n\nTöltsd ki a gyors ízválasztót: ${emailUrl(
+          "/hu#melyik-momo",
+          "newsletter_welcome_3"
+        )}` + foot
+      )
+    case "winback-60":
+      return (
+        `Régen habosítottunk együtt.\n\nHa újra jól esne egy Momo, itt folytathatod: ${
+          data.shop_url ?? emailUrl("/hu#melyik-momo", "winback_60")
+        }` + foot
+      )
+    case "winback-90":
+      return (
+        `Újrakezdjük egy hozzád illő Momóval?\n\nNincs sürgetés — itt találod a következő ízt: ${
+          data.shop_url ?? emailUrl("/hu#melyik-momo", "winback_90")
+        }` + foot
+      )
+    case "post-purchase-prep":
+      return (
+        `Készülj az első habos Momódra!\n\n1. Szitálj 1–2 g matchát a tálba.\n2. Adj hozzá 50–80 ml, 75–80 °C-os vizet.\n3. Habosíts gyors M vagy W mozdulatokkal 20–30 másodpercig.\n\nTeljes útmutató: ${
+          data.guide_url ??
+          emailUrl("/hu/tudastar/matcha-keszites", "post_purchase_prep")
+        }` + foot
+      )
+    case "refill-reminder":
+      return (
+        `Fogyóban a matchád?\n\nHa a doboz alja már kezd előbukkanni, itt könnyen feltöltheted a matcha-polcot: ${
+          data.shop_url ?? emailUrl("/hu/store", "refill_reminder")
+        }\n\nHa még van otthon bőven, nincs semmi teendőd.` + foot
       )
     default:
       return `${data.subject ?? "Momo Matcha"}\n\n${data.message ?? ""}` + foot
@@ -429,16 +658,33 @@ class ResendNotificationProviderService extends AbstractNotificationProviderServ
     const data = (notification.data ?? {}) as Record<string, any>
     const template = notification.template ?? ""
     const marketing = MARKETING_TEMPLATES.has(template)
+    const recipient = Array.isArray(notification.to)
+      ? String(notification.to[0] ?? "")
+      : String(notification.to ?? "")
+    const unsubscribeUrl = marketing
+      ? createUnsubscribeUrl(recipient)
+      : undefined
     const subject =
       (data.subject as string) || notification.template || "Momo Matcha"
+    const preheader = String(data.preheader ?? preheaderFor(template, data))
     const html =
       notification.content?.html ||
-      layout(renderBody(template, data), subject, marketing)
-    const text = notification.content?.text || renderText(template, data)
+      layout(
+        renderBody(template, data),
+        preheader,
+        marketing,
+        template,
+        unsubscribeUrl
+      )
+    const text =
+      notification.content?.text || renderText(template, data, unsubscribeUrl)
     const from =
       notification.from ||
       this.options_.from ||
       "Momo Matcha <onboarding@resend.dev>"
+    const idempotencyKey = data.idempotency_key
+      ? String(data.idempotency_key).replace(/[\r\n]/g, "").slice(0, 256)
+      : undefined
 
     // No API key (e.g. local dev): log instead of sending, so nothing breaks.
     if (!this.options_.apiKey) {
@@ -454,6 +700,9 @@ class ResendNotificationProviderService extends AbstractNotificationProviderServ
         headers: {
           Authorization: `Bearer ${this.options_.apiKey}`,
           "Content-Type": "application/json",
+          ...(idempotencyKey
+            ? { "Idempotency-Key": idempotencyKey }
+            : {}),
         },
         body: JSON.stringify({
           from,
@@ -462,10 +711,11 @@ class ResendNotificationProviderService extends AbstractNotificationProviderServ
           html,
           text,
           // Gmail/Yahoo bulk-sender requirement for promotional mail.
-          ...(marketing
+          ...(marketing && unsubscribeUrl
             ? {
                 headers: {
-                  "List-Unsubscribe": `<mailto:${CONTACT}?subject=Leiratkozas>`,
+                  "List-Unsubscribe": `<${unsubscribeUrl}>`,
+                  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
                 },
               }
             : {}),

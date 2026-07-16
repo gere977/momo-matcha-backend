@@ -44,6 +44,8 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
   }
 
   try {
+    const utmSource = channel === "email" ? "newsletter" : channel
+    const utmMedium = channel === "email" ? "email" : "social"
     const client = getAnthropic()
     const response = await client.messages.create({
       model: CLAUDE_MODEL,
@@ -58,7 +60,7 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
             (product_title ? `Kiemelt termék: ${product_title}\n` : "") +
             (notes ? `További kérés: ${notes}\n` : "") +
             `\nHa linkelsz, használj UTM paramétereket ebben a formában: ` +
-            `https://momomatcha.hu/?utm_source=${channel}&utm_medium=social&utm_campaign=SLUG ` +
+            `https://momomatcha.hu/?utm_source=${utmSource}&utm_medium=${utmMedium}&utm_campaign=SLUG ` +
             `(a SLUG legyen a téma rövid, ékezet nélküli azonosítója) — így a admin Statisztika oldalon mérhető lesz a kampány.`,
         },
       ],
